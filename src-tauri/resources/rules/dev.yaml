@@ -1,0 +1,173 @@
+# 开发工具包管理器与 IDE 缓存
+- id: dev.pip
+  name: pip 缓存
+  category: dev
+  risk: L1
+  os: [windows, macos]
+  default_selected: true
+  delete: permanent
+  description: Python 包安装缓存，删除后再次安装同名包需要重新下载
+  targets:
+    - os: [windows]
+      paths: ["${LOCALAPPDATA}/pip/cache"]
+    - os: [macos]
+      paths: ["${HOME}/Library/Caches/pip"]
+
+- id: dev.npm
+  name: npm 缓存
+  category: dev
+  risk: L1
+  os: [windows, macos]
+  default_selected: true
+  delete: permanent
+  description: npm 包下载缓存（_cacache），可通过 npm cache verify 重建索引
+  targets:
+    - os: [windows]
+      paths: ["${LOCALAPPDATA}/npm-cache"]
+    - os: [macos]
+      paths: ["${HOME}/.npm/_cacache"]
+
+- id: dev.pnpm
+  name: pnpm store
+  category: dev
+  risk: L1
+  os: [windows, macos]
+  default_selected: false
+  delete: permanent
+  description: pnpm 全局内容寻址仓库；删除后项目依赖需重新链接/下载，建议优先使用 pnpm store prune
+  targets:
+    - os: [windows]
+      paths: ["${LOCALAPPDATA}/pnpm/store"]
+    - os: [macos]
+      paths: ["${HOME}/Library/pnpm/store"]
+
+- id: dev.yarn
+  name: Yarn 缓存
+  category: dev
+  risk: L1
+  os: [windows, macos]
+  default_selected: true
+  delete: permanent
+  description: Yarn 包下载缓存
+  targets:
+    - os: [windows]
+      paths: ["${LOCALAPPDATA}/Yarn/Cache"]
+    - os: [macos]
+      paths: ["${HOME}/Library/Caches/Yarn"]
+
+- id: dev.uv
+  name: uv 缓存
+  category: dev
+  risk: L1
+  os: [windows, macos]
+  default_selected: true
+  delete: permanent
+  description: uv（Python 包管理器）下载缓存
+  targets:
+    - os: [windows]
+      paths: ["${LOCALAPPDATA}/uv/cache"]
+    - os: [macos]
+      paths: ["${HOME}/.cache/uv"]
+
+- id: dev.cargo
+  name: Cargo 注册表缓存
+  category: dev
+  risk: L1
+  os: [windows, macos]
+  default_selected: true
+  delete: permanent
+  description: 只清 registry/cache 下载压缩包，不影响已编译的 Rust 工程
+  targets:
+    - os: [windows, macos]
+      paths: ["${HOME}/.cargo/registry/cache"]
+
+- id: dev.go_build
+  name: Go 构建缓存
+  category: dev
+  risk: L1
+  os: [windows, macos]
+  default_selected: true
+  delete: permanent
+  description: go build 缓存，等价于 go clean -cache 的效果，下次编译变慢
+  targets:
+    - os: [windows]
+      paths: ["${LOCALAPPDATA}/go-build"]
+    - os: [macos]
+      paths: ["${HOME}/Library/Caches/go-build"]
+
+- id: dev.nuget_http
+  name: NuGet HTTP 缓存
+  category: dev
+  risk: L1
+  os: [windows]
+  default_selected: true
+  delete: permanent
+  description: NuGet 还原用的 HTTP 缓存（v3-cache），不是全局 packages 目录
+  targets:
+    - os: [windows]
+      paths: ["${LOCALAPPDATA}/NuGet/v3-cache"]
+
+- id: dev.conda_pkgs
+  name: Conda 包缓存
+  category: dev
+  risk: L1
+  os: [windows, macos]
+  default_selected: false
+  delete: permanent
+  description: miniconda/anaconda 的 pkgs 安装包缓存，删除后新建环境需重新下载
+  targets:
+    - os: [windows, macos]
+      paths:
+        - "${HOME}/miniconda3/pkgs"
+        - "${HOME}/anaconda3/pkgs"
+
+- id: dev.jetbrains
+  name: JetBrains IDE 缓存
+  category: dev
+  risk: L1
+  os: [windows, macos]
+  default_selected: false
+  delete: permanent
+  description: IDEA/PyCharm 等的索引缓存，删除后首次打开项目需要重建索引
+  targets:
+    - os: [windows]
+      paths: ["${LOCALAPPDATA}/JetBrains/*/caches"]
+    - os: [macos]
+      paths: ["${HOME}/Library/Caches/JetBrains/*/caches"]
+
+- id: dev.xcode_derived
+  name: Xcode DerivedData
+  category: dev
+  risk: L1
+  os: [macos]
+  default_selected: false
+  delete: permanent
+  description: 构建派生数据，删除后下次完整重新编译
+  targets:
+    - os: [macos]
+      paths: ["${HOME}/Library/Developer/Xcode/DerivedData"]
+
+- id: dev.xcode_devicesupport
+  name: iOS DeviceSupport 调试符号
+  category: dev
+  risk: L1
+  os: [macos]
+  default_selected: false
+  delete: permanent
+  description: 历史 iOS 版本调试符号，占用常达数 GB，不影响当前设备调试
+  targets:
+    - os: [macos]
+      paths: ["${HOME}/Library/Developer/Xcode/iOS DeviceSupport"]
+
+- id: dev.simulator_caches
+  name: iOS 模拟器缓存
+  category: dev
+  risk: L1
+  os: [macos]
+  default_selected: false
+  delete: permanent
+  description: CoreSimulator 缓存；模拟器设备内的 App 与数据保留不动
+  targets:
+    - os: [macos]
+      paths:
+        - "${HOME}/Library/Developer/CoreSimulator/Caches"

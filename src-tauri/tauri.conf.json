@@ -1,0 +1,76 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "CClean",
+  "version": "0.1.0",
+  "identifier": "com.cclean.desktop",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "CClean 磁盘清理",
+        "width": 1080,
+        "height": 760,
+        "minWidth": 920,
+        "minHeight": 640
+      },
+      {
+        "label": "float",
+        "url": "index.html",
+        "width": 200,
+        "height": 64,
+        "x": 40,
+        "y": 120,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": false,
+        "visible": false,
+        "focus": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "createUpdaterArtifacts": true,
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": ["SimpChinese", "English"],
+        "displayLanguageSelector": false,
+        "installerIcon": "icons/icon.ico",
+        "uninstallerIcon": "icons/icon.ico"
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDRFNDYwQjA0MjYzQjUzQjQKUldTMFV6c21CQXRHVGoybWZzdlNOZ2VRSlZkOS8rK2xBK0o5R2VkWEFnV0tZRjE1Z3J5U1pJMTAK",
+      "endpoints": [
+        "https://github.com/joker20020/CClean/releases/latest/download/latest.json"
+      ],
+      "dialog": false
+    }
+  }
+}

@@ -1,0 +1,89 @@
+# 浏览器缓存：只清 Cache 族目录，绝不触碰 Cookies/历史/书签/密码
+- id: browser.chrome
+  name: Chrome 缓存
+  category: browser
+  risk: L1
+  os: [windows, macos]
+  default_selected: true
+  delete: permanent
+  description: 仅清理 Cache / Code Cache / GPUCache；浏览器运行时部分文件会跳过，建议先关闭
+  targets:
+    - os: [windows]
+      paths:
+        - "${LOCALAPPDATA}/Google/Chrome/User Data/*/Cache"
+        - "${LOCALAPPDATA}/Google/Chrome/User Data/*/Code Cache"
+        - "${LOCALAPPDATA}/Google/Chrome/User Data/*/GPUCache"
+    - os: [macos]
+      paths:
+        - "${HOME}/Library/Application Support/Google/Chrome/*/Cache"
+        - "${HOME}/Library/Application Support/Google/Chrome/*/Code Cache"
+        - "${HOME}/Library/Application Support/Google/Chrome/*/GPUCache"
+
+- id: browser.edge
+  name: Edge 缓存
+  category: browser
+  risk: L1
+  os: [windows, macos]
+  default_selected: true
+  delete: permanent
+  description: 仅清理 Cache / Code Cache / GPUCache；建议先关闭浏览器
+  targets:
+    - os: [windows]
+      paths:
+        - "${LOCALAPPDATA}/Microsoft/Edge/User Data/*/Cache"
+        - "${LOCALAPPDATA}/Microsoft/Edge/User Data/*/Code Cache"
+        - "${LOCALAPPDATA}/Microsoft/Edge/User Data/*/GPUCache"
+    - os: [macos]
+      paths:
+        - "${HOME}/Library/Application Support/Microsoft Edge/*/Cache"
+        - "${HOME}/Library/Application Support/Microsoft Edge/*/Code Cache"
+        - "${HOME}/Library/Application Support/Microsoft Edge/*/GPUCache"
+
+- id: browser.brave
+  name: Brave 缓存
+  category: browser
+  risk: L1
+  os: [windows, macos]
+  default_selected: true
+  delete: permanent
+  description: 仅清理 Cache / Code Cache / GPUCache；建议先关闭浏览器
+  targets:
+    - os: [windows]
+      paths:
+        - "${LOCALAPPDATA}/BraveSoftware/Brave-Browser/User Data/*/Cache"
+        - "${LOCALAPPDATA}/BraveSoftware/Brave-Browser/User Data/*/Code Cache"
+        - "${LOCALAPPDATA}/BraveSoftware/Brave-Browser/User Data/*/GPUCache"
+    - os: [macos]
+      paths:
+        - "${HOME}/Library/Application Support/BraveSoftware/Brave-Browser/*/Cache"
+        - "${HOME}/Library/Application Support/BraveSoftware/Brave-Browser/*/Code Cache"
+        - "${HOME}/Library/Application Support/BraveSoftware/Brave-Browser/*/GPUCache"
+
+- id: browser.firefox
+  name: Firefox 缓存
+  category: browser
+  risk: L1
+  os: [windows, macos]
+  default_selected: true
+  delete: permanent
+  description: 仅清理 cache2；建议先关闭浏览器
+  targets:
+    - os: [windows]
+      paths:
+        - "${LOCALAPPDATA}/Mozilla/Firefox/Profiles/*/cache2"
+    - os: [macos]
+      paths:
+        - "${HOME}/Library/Application Support/Firefox/Profiles/*/cache2"
+
+- id: browser.safari
+  name: Safari 缓存
+  category: browser
+  risk: L1
+  os: [macos]
+  default_selected: false
+  delete: permanent
+  description: 仅清理 Caches 目录，不碰书签、历史与密码
+  targets:
+    - os: [macos]
+      paths:
+        - "${HOME}/Library/Caches/com.apple.Safari"

@@ -1,0 +1,129 @@
+# 只报告项：模型库、虚拟磁盘、系统大文件等。扫描展示大小并提供打开目录/官方指引，绝不自动删除。
+- id: report.ollama_models
+  name: Ollama 模型库
+  category: ai
+  risk: L0
+  os: [windows, macos]
+  default_selected: false
+  action: report
+  description: 本地大模型文件，删除需使用 ollama rm <模型名>；误删后需重新下载数 GB 至数十 GB
+  targets:
+    - os: [windows, macos]
+      paths: ["${HOME}/.ollama/models"]
+
+- id: report.hf_models
+  name: HuggingFace 模型缓存
+  category: ai
+  risk: L0
+  os: [windows, macos]
+  default_selected: false
+  action: report
+  description: 已下载的完整模型/数据集；可用 huggingface-cli 删除或在文件管理器中手动处理
+  targets:
+    - os: [windows, macos]
+      paths: ["${HOME}/.cache/huggingface/hub"]
+
+- id: report.modelscope_models
+  name: ModelScope 模型缓存
+  category: ai
+  risk: L0
+  os: [windows, macos]
+  default_selected: false
+  action: report
+  description: 魔搭社区下载的完整模型；请在文件管理器中确认后手动删除
+  targets:
+    - os: [windows, macos]
+      paths: ["${HOME}/.cache/modelscope/hub"]
+
+- id: report.lmstudio_models
+  name: LM Studio 模型库
+  category: ai
+  risk: L0
+  os: [windows, macos]
+  default_selected: false
+  action: report
+  description: LM Studio 下载的 GGUF 等模型；建议在 LM Studio 的 My Models 中删除
+  targets:
+    - os: [windows, macos]
+      paths:
+        - "${HOME}/.cache/lm-studio/models"
+        - "${HOME}/.lmstudio/models"
+
+- id: report.torch_hub
+  name: Torch Hub 模型
+  category: ai
+  risk: L0
+  os: [windows, macos]
+  default_selected: false
+  action: report
+  description: torch.hub 下载的预训练权重
+  targets:
+    - os: [windows, macos]
+      paths: ["${HOME}/.cache/torch/hub"]
+
+- id: report.windows_old
+  name: Windows.old 旧系统
+  category: system
+  risk: L0
+  os: [windows]
+  default_selected: false
+  action: report
+  description: 回退旧系统版本的唯一途径；请通过“设置-存储-临时文件”或 cleanmgr 删除，切勿手动强删
+  targets:
+    - os: [windows]
+      paths: ["C:/Windows.old"]
+
+- id: report.system_bigfiles
+  name: 休眠与页面文件
+  category: system
+  risk: L0
+  os: [windows]
+  default_selected: false
+  action: report
+  description: hiberfil.sys 可在确认不用休眠后以 powercfg /h off 关闭；pagefile.sys 不建议删除
+  targets:
+    - os: [windows]
+      paths:
+        - "C:/hiberfil.sys"
+        - "C:/pagefile.sys"
+        - "C:/swapfile.sys"
+
+- id: report.docker_vhdx
+  name: Docker / WSL 虚拟磁盘
+  category: dev
+  risk: L0
+  os: [windows]
+  default_selected: false
+  action: report
+  description: 虚拟磁盘文件只能通过 docker builder prune、wsl --shutdown 后压缩等官方方式处理，直接删除会损坏环境
+  targets:
+    - os: [windows]
+      paths:
+        - "${LOCALAPPDATA}/Docker/wsl/disk/*.vhdx"
+        - "${LOCALAPPDATA}/Docker/wsl/data/*.vhdx"
+        - "${LOCALAPPDATA}/Packages/CanonicalGroupLimited.*/LocalState/ext4.vhdx"
+
+- id: report.docker_raw
+  name: Docker.raw 虚拟磁盘
+  category: dev
+  risk: L0
+  os: [macos]
+  default_selected: false
+  action: report
+  description: Docker Desktop 磁盘镜像，请在 Docker Desktop 设置中清理后压缩
+  targets:
+    - os: [macos]
+      paths:
+        - "${HOME}/Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw"
+
+- id: report.ios_backup
+  name: iPhone/iPad 本地备份
+  category: system
+  risk: L0
+  os: [macos]
+  default_selected: false
+  action: report
+  description: 通过 Finder 或“设备管理”删除旧设备备份，勿手动删目录
+  targets:
+    - os: [macos]
+      paths: ["${HOME}/Library/Application Support/MobileSync/Backup"]

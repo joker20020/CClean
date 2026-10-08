@@ -1,0 +1,30 @@
+# 通讯与常见应用：只清纯缓存目录，接收的文件/图片/视频属于个人资料，绝不清理
+- id: apps.wechat_cache
+  name: 微信缓存
+  category: apps
+  risk: L1
+  os: [windows]
+  default_selected: true
+  delete: permanent
+  description: 仅清理 FileStorage 下的 Cache/Temp 临时缓存；接收的文件、图片、视频保留不动
+  targets:
+    - os: [windows]
+      paths:
+        - "${USERPROFILE}/Documents/xwechat_files/*/msg/FileStorage/Cache"
+        - "${USERPROFILE}/Documents/xwechat_files/*/msg/FileStorage/Temp"
+        - "${USERPROFILE}/Documents/WeChat Files/*/FileStorage/Cache"
+        - "${USERPROFILE}/Documents/WeChat Files/*/FileStorage/Temp"
+
+- id: apps.qqnt_cache
+  name: QNT 版 QQ 缓存
+  category: apps
+  risk: L1
+  os: [windows]
+  default_selected: true
+  delete: permanent
+  description: 仅清理 NT 版 QQ 的 Cache/Temp 目录；接收的文件与聊天记录保留不动
+  targets:
+    - os: [windows]
+      paths:
+        - "${USERPROFILE}/Documents/Tencent Files/*/nt_qq/nt_data/Cache"
+        - "${USERPROFILE}/Documents/Tencent Files/*/nt_qq/nt_data/Temp"

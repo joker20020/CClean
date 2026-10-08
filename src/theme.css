@@ -1,0 +1,412 @@
+/* ============================================================
+   CClean 设计系统：主题令牌 + 全局基础组件
+   ============================================================ */
+
+/* ---------- 浅色主题（默认） ---------- */
+:root {
+  --bg: #f3f5fa;
+  --bg-soft: #eef1f8;
+  --sidebar: #ffffff;
+  --sidebar-border: #e4e9f2;
+  --panel: #ffffff;
+  --panel-2: #f7f9fd;
+  --panel-hover: #f4f7fc;
+  --border: #e6eaf2;
+  --border-strong: #d6dce8;
+  --text: #1a2336;
+  --text-2: #475069;
+  --muted: #7d879c;
+
+  --primary: #2f6bff;
+  --primary-hover: #1f5af0;
+  --primary-soft: #eaf1ff;
+  --primary-soft-text: #1d4ed8;
+
+  --green: #059669;
+  --green-soft: #e6f7f0;
+  --green-text: #047857;
+  --amber: #d97706;
+  --amber-soft: #fdf3e0;
+  --amber-text: #b45309;
+  --red: #dc2626;
+  --red-soft: #fdecec;
+  --red-text: #dc2626;
+  --purple: #7c3aed;
+  --purple-soft: #f2edfe;
+  --purple-text: #6d28d9;
+
+  --track: #e9eef7;
+  --shadow-panel: 0 1px 2px rgba(16, 24, 40, 0.04), 0 8px 24px -14px rgba(16, 24, 40, 0.14);
+  --shadow-pop: 0 8px 28px -8px rgba(16, 24, 40, 0.22);
+  --code-bg: #0f172a;
+  --code-text: #cbd5e1;
+
+  /* 浮窗（浅色：浅色毛玻璃） */
+  --float-bg: rgba(255, 255, 255, 0.9);
+  --float-border: rgba(15, 23, 42, 0.08);
+  --float-text: #16203a;
+  --float-muted: #6b768c;
+  --float-track: #e2e8f4;
+  --float-btn: rgba(15, 23, 42, 0.06);
+  --float-btn-hover: rgba(15, 23, 42, 0.12);
+  --float-shadow: 0 4px 18px -6px rgba(15, 23, 42, 0.28);
+
+  color-scheme: light;
+}
+
+/* ---------- 深色主题 ---------- */
+:root[data-theme="dark"] {
+  --bg: #0b1120;
+  --bg-soft: #0e1628;
+  --sidebar: #0f1729;
+  --sidebar-border: #1e2a44;
+  --panel: #141d33;
+  --panel-2: #18223b;
+  --panel-hover: #1c2842;
+  --border: #232f4b;
+  --border-strong: #2e3c5c;
+  --text: #e8edf8;
+  --text-2: #b7c1d6;
+  --muted: #8491ab;
+
+  --primary: #5b8cff;
+  --primary-hover: #709bff;
+  --primary-soft: #1b2a4e;
+  --primary-soft-text: #a9c2ff;
+
+  --green: #34d399;
+  --green-soft: rgba(52, 211, 153, 0.13);
+  --green-text: #34d399;
+  --amber: #fbbf24;
+  --amber-soft: rgba(251, 191, 36, 0.13);
+  --amber-text: #fbbf24;
+  --red: #f87171;
+  --red-soft: rgba(248, 113, 113, 0.13);
+  --red-text: #f87171;
+  --purple: #c4b5fd;
+  --purple-soft: rgba(167, 139, 250, 0.15);
+  --purple-text: #c4b5fd;
+
+  --track: #263352;
+  --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 28px -14px rgba(0, 0, 0, 0.55);
+  --shadow-pop: 0 10px 30px -8px rgba(0, 0, 0, 0.6);
+  --code-bg: #0a1120;
+  --code-text: #cbd5e1;
+
+  --float-bg: rgba(20, 29, 51, 0.92);
+  --float-border: rgba(255, 255, 255, 0.07);
+  --float-text: #eef2fb;
+  --float-muted: #93a0bd;
+  --float-track: #2a3656;
+  --float-btn: rgba(255, 255, 255, 0.08);
+  --float-btn-hover: rgba(255, 255, 255, 0.16);
+  --float-shadow: 0 6px 22px -6px rgba(0, 0, 0, 0.65);
+
+  color-scheme: dark;
+}
+
+/* ---------- 基础重置 ---------- */
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+body {
+  font-family: "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, -apple-system,
+    "PingFang SC", sans-serif;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* 滚动条 */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+  background-clip: content-box;
+  border: 2px solid transparent;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ---------- 面板 ---------- */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px 22px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-panel);
+  transition: background-color 0.25s ease, border-color 0.25s ease;
+}
+.panel-title {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 14px;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.muted {
+  color: var(--muted);
+}
+
+/* ---------- 按钮 ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  padding: 8px 16px;
+  font-size: 13.5px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+.btn-ghost {
+  background: var(--panel-2);
+  color: var(--text-2);
+  border-color: var(--border);
+}
+.btn-ghost:hover:not(:disabled) {
+  background: var(--panel-hover);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.btn-danger {
+  background: var(--red-soft);
+  color: var(--red-text);
+}
+.btn-danger:hover:not(:disabled) {
+  filter: brightness(0.97);
+}
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 12.5px;
+  border-radius: 8px;
+}
+
+/* ---------- 风险标签 ---------- */
+.tag {
+  display: inline-block;
+  border-radius: 7px;
+  padding: 1px 8px;
+  font-size: 11px;
+  line-height: 1.6;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.tag-L0 {
+  background: var(--panel-2);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+.tag-L1 {
+  background: var(--green-soft);
+  color: var(--green-text);
+}
+.tag-L2 {
+  background: var(--amber-soft);
+  color: var(--amber-text);
+}
+
+/* ---------- 表单 ---------- */
+input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--primary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+select,
+input[type="number"],
+input[type="text"] {
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 6px 10px;
+  outline: none;
+}
+select:focus,
+input:focus,
+textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+/* ---------- 数据表格 ---------- */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.data-table th {
+  text-align: left;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 12px;
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.data-table td {
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.data-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.data-table tbody tr {
+  transition: background-color 0.12s ease;
+}
+.data-table tbody tr:hover {
+  background: var(--panel-hover);
+}
+
+/* ---------- 分段控件 ---------- */
+.seg {
+  display: inline-flex;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 3px;
+  gap: 2px;
+}
+.seg button {
+  border: 0;
+  background: transparent;
+  padding: 6px 14px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text-2);
+  transition: all 0.15s ease;
+}
+.seg button.active {
+  background: var(--panel);
+  color: var(--primary);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.12);
+}
+:root[data-theme="dark"] .seg button.active {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+/* ---------- 链接按钮 ---------- */
+.link-btn {
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  cursor: pointer;
+  font-size: 12.5px;
+  font-family: inherit;
+  padding: 2px 4px;
+  border-radius: 6px;
+}
+.link-btn:hover {
+  text-decoration: underline;
+}
+
+/* ---------- 折叠卡片 ---------- */
+.collapse-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  margin-bottom: 14px;
+  box-shadow: var(--shadow-panel);
+  overflow: hidden;
+}
+.collapse-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  padding: 14px 18px;
+  cursor: pointer;
+  text-align: left;
+}
+.collapse-head:hover {
+  background: var(--panel-hover);
+}
+.collapse-chevron {
+  color: var(--muted);
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+.collapse-card.open .collapse-chevron {
+  transform: rotate(90deg);
+}
+.collapse-body {
+  padding: 4px 18px 16px;
+}
+
+/* ---------- 通用进度条 ---------- */
+.bar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--track);
+  overflow: hidden;
+}
+.bar-fill {
+  height: 8px;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+
+/* 显示更多按钮 */
+.show-more {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  cursor: pointer;
+  font-size: 12.5px;
+  font-family: inherit;
+  padding: 8px;
+  border-radius: 8px;
+}
+.show-more:hover {
+  background: var(--panel-hover);
+}

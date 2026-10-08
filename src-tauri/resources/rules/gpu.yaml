@@ -1,0 +1,71 @@
+# 显卡着色器缓存与游戏平台网页缓存
+- id: gpu.nvidia
+  name: NVIDIA 着色器缓存
+  category: gpu
+  risk: L1
+  os: [windows]
+  default_selected: true
+  delete: permanent
+  description: DXCache/GLCache/NV_Cache，删除后游戏首次加载会重新生成着色器，期间短暂卡顿属正常
+  targets:
+    - os: [windows]
+      paths:
+        - "${LOCALAPPDATA}/NVIDIA/DXCache"
+        - "${LOCALAPPDATA}/NVIDIA/GLCache"
+        - "${LOCALAPPDATA}/NVIDIA Corporation/NV_Cache"
+
+- id: gpu.d3d
+  name: Windows D3D 着色器缓存
+  category: gpu
+  risk: L1
+  os: [windows]
+  default_selected: true
+  delete: permanent
+  description: DirectX 着色器缓存，会自动重建
+  targets:
+    - os: [windows]
+      paths:
+        - "${LOCALAPPDATA}/D3DSCache"
+
+- id: gpu.amd
+  name: AMD 着色器缓存
+  category: gpu
+  risk: L1
+  os: [windows]
+  default_selected: true
+  delete: permanent
+  description: AMD 显卡 DX/GLCache，会自动重建
+  targets:
+    - os: [windows]
+      paths:
+        - "${LOCALAPPDATA}/AMD/DxCache"
+        - "${LOCALAPPDATA}/AMD/GLCache"
+
+- id: gpu.intel
+  name: Intel 着色器缓存
+  category: gpu
+  risk: L1
+  os: [windows]
+  default_selected: true
+  delete: permanent
+  description: Intel 核显 ShaderCache，会自动重建
+  targets:
+    - os: [windows]
+      paths:
+        - "${LOCALAPPDATA}/Intel/ShaderCache"
+
+- id: gpu.steam_html
+  name: Steam 内嵌浏览器缓存
+  category: gpu
+  risk: L1
+  os: [windows, macos]
+  default_selected: true
+  delete: permanent
+  description: Steam 商店页面的网页缓存，不影响游戏文件
+  targets:
+    - os: [windows]
+      paths:
+        - "${LOCALAPPDATA}/Steam/htmlcache"
+    - os: [macos]
+      paths:
+        - "${HOME}/Library/Application Support/Steam/htmlcache"

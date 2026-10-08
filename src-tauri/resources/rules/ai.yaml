@@ -1,0 +1,339 @@
+# AI 工具专项：AI IDE 与 AI 桌面端缓存（可清理）；模型库见 report.yaml（只报告）
+- id: ai.cursor
+  name: Cursor 缓存
+  category: ai
+  risk: L1
+  os: [windows, macos]
+  default_selected: true
+  delete: permanent
+  description: 只清 Electron 缓存族目录与日志，不碰工作区状态、登录与设置
+  targets:
+    - os: [windows]
+      paths:
+        - "${APPDATA}/Cursor/Cache"
+        - "${APPDATA}/Cursor/CachedData"
+        - "${APPDATA}/Cursor/Code Cache"
+        - "${APPDATA}/Cursor/GPUCache"
+        - "${APPDATA}/Cursor/logs"
+        - "${APPDATA}/Cursor/CachedExtensionVSIXs"
+    - os: [macos]
+      paths:
+        - "${HOME}/Library/Application Support/Cursor/Cache"
+        - "${HOME}/Library/Application Support/Cursor/CachedData"
+        - "${HOME}/Library/Application Support/Cursor/Code Cache"
+        - "${HOME}/Library/Application Support/Cursor/GPUCache"
+        - "${HOME}/Library/Application Support/Cursor/logs"
+        - "${HOME}/Library/Application Support/Cursor/CachedExtensionVSIXs"
+
+- id: ai.vscode
+  name: VS Code 缓存
+  category: ai
+  risk: L1
+  os: [windows, macos]
+  default_selected: true
+  delete: permanent
+  description: VS Code / VSCodium / Windsurf / Trae 的 Electron 缓存，不碰设置与扩展配置
+  targets:
+    - os: [windows]
+      paths:
+        - "${APPDATA}/Code/Cache"
+        - "${APPDATA}/Code/CachedData"
+        - "${APPDATA}/Code/Code Cache"
+        - "${APPDATA}/Code/GPUCache"
+        - "${APPDATA}/Code/logs"
+        - "${APPDATA}/VSCodium/Cache"
+        - "${APPDATA}/VSCodium/CachedData"
+        - "${APPDATA}/VSCodium/GPUCache"
+        - "${APPDATA}/Windsurf/Cache"
+        - "${APPDATA}/Windsurf/CachedData"
+        - "${APPDATA}/Windsurf/GPUCache"
+        - "${APPDATA}/Trae/Cache"
+        - "${APPDATA}/Trae/CachedData"
+        - "${APPDATA}/Trae/GPUCache"
+    - os: [macos]
+      paths:
+        - "${HOME}/Library/Application Support/Code/Cache"
+        - "${HOME}/Library/Application Support/Code/CachedData"
+        - "${HOME}/Library/Application Support/Code/GPUCache"
+        - "${HOME}/Library/Application Support/Code/logs"
+        - "${HOME}/Library/Application Support/VSCodium/Cache"
+        - "${HOME}/Library/Application Support/VSCodium/CachedData"
+        - "${HOME}/Library/Application Support/Windsurf/Cache"
+        - "${HOME}/Library/Application Support/Windsurf/CachedData"
+        - "${HOME}/Library/Application Support/Trae/Cache"
+        - "${HOME}/Library/Application Support/Trae/CachedData"
+
+- id: ai.claude_desktop
+  name: Claude 桌面端缓存
+  category: ai
+  risk: L1
+  os: [windows, macos]
+  default_selected: true
+  delete: permanent
+  description: Claude Desktop 的 Electron 缓存，不碰登录与会话记录
+  targets:
+    - os: [windows]
+      paths:
+        - "${APPDATA}/Claude/Cache"
+        - "${APPDATA}/Claude/Code Cache"
+        - "${APPDATA}/Claude/GPUCache"
+        - "${APPDATA}/Claude/logs"
+    - os: [macos]
+      paths:
+        - "${HOME}/Library/Application Support/Claude/Cache"
+        - "${HOME}/Library/Application Support/Claude/Code Cache"
+        - "${HOME}/Library/Application Support/Claude/GPUCache"
+        - "${HOME}/Library/Containers/com.anthropic.claudefordesktop/Data/Library/Caches"
+
+- id: ai.chatgpt_desktop
+  name: ChatGPT 桌面端缓存
+  category: ai
+  risk: L1
+  os: [windows, macos]
+  default_selected: true
+  delete: permanent
+  description: ChatGPT 桌面端的应用缓存，不碰登录与会话
+  targets:
+    - os: [windows]
+      paths:
+        - "${APPDATA}/ChatGPT/Cache"
+        - "${APPDATA}/ChatGPT/Code Cache"
+        - "${APPDATA}/ChatGPT/GPUCache"
+        - "${LOCALAPPDATA}/com.openai.chat/Cache"
+    - os: [macos]
+      paths:
+        - "${HOME}/Library/Containers/com.openai.chat/Data/Library/Caches"
+
+- id: ai.hf_incomplete
+  name: HuggingFace 未完成下载
+  category: ai
+  risk: L1
+  os: [windows, macos]
+  default_selected: true
+  delete: permanent
+  description: 仅清理 hub 目录下的 .incomplete 下载残片；完整模型在“AI 专项”页只报告、不删除
+  targets:
+    - os: [windows, macos]
+      paths: ["${HOME}/.cache/huggingface/hub"]
+      include: ["**/*.incomplete"]
+
+- id: ai.torch_extensions
+  name: Torch 扩展编译缓存
+  category: ai
+  risk: L1
+  os: [windows, macos]
+  default_selected: true
+  delete: permanent
+  description: 自定义 CUDA/算子的 JIT 编译产物，下次运行自动重新编译
+  targets:
+    - os: [windows]
+      paths: ["${LOCALAPPDATA}/torch_extensions"]
+    - os: [macos]
+      paths: ["${HOME}/.cache/torch_extensions"]
+
+- id: ai.jupyter_runtime
+  name: Jupyter 运行时文件
+  category: ai
+  risk: L1
+  os: [windows, macos]
+  default_selected: true
+  delete: permanent
+  description: 历史 kernel 连接文件（kernel-*.json）与运行时残留
+  targets:
+    - os: [windows]
+      paths: ["${APPDATA}/jupyter/runtime"]
+    - os: [macos]
+      paths: ["${HOME}/Library/Jupyter/runtime"]
+
+# ===== 常用 Agent 工具（桌面端 / CLI）=====
+
+- id: ai.doubao
+  name: 豆包桌面端缓存
+  category: ai
+  risk: L1
+  os: [windows, macos]
+  default_selected: true
+  delete: permanent
+  description: 豆包桌面客户端的 Chromium 缓存、着色器缓存与组件缓存；不碰登录、对话记录与 skills
+  targets:
+    - os: [windows]
+      paths:
+        - "${LOCALAPPDATA}/Doubao/User Data/Default/Cache"
+        - "${LOCALAPPDATA}/Doubao/User Data/Default/Code Cache"
+        - "${LOCALAPPDATA}/Doubao/User Data/Default/GPUCache"
+        - "${LOCALAPPDATA}/Doubao/User Data/Default/DawnGraphiteCache"
+        - "${LOCALAPPDATA}/Doubao/User Data/Default/DawnWebGPUCache"
+        - "${LOCALAPPDATA}/Doubao/User Data/Default/AutofillAiModelCache"
+        - "${LOCALAPPDATA}/Doubao/User Data/ShaderCache"
+        - "${LOCALAPPDATA}/Doubao/User Data/GrShaderCache"
+        - "${LOCALAPPDATA}/Doubao/User Data/GraphiteDawnCache"
+        - "${LOCALAPPDATA}/Doubao/User Data/gecko_cache"
+        - "${LOCALAPPDATA}/Doubao/User Data/component_crx_cache"
+        - "${LOCALAPPDATA}/Doubao/User Data/extensions_crx_cache"
+        - "${LOCALAPPDATA}/Doubao/User Data/Crashpad"
+    - os: [macos]
+      paths:
+        - "${HOME}/Library/Application Support/Doubao/User Data/Default/Cache"
+        - "${HOME}/Library/Application Support/Doubao/User Data/Default/Code Cache"
+        - "${HOME}/Library/Application Support/Doubao/User Data/Default/GPUCache"
+        - "${HOME}/Library/Application Support/Doubao/User Data/ShaderCache"
+        - "${HOME}/Library/Caches/Doubao"
+
+- id: ai.workbuddy
+  name: 腾讯 WorkBuddy 缓存
+  category: ai
+  risk: L1
+  os: [windows, macos]
+  default_selected: true
+  delete: permanent
+  description: 腾讯 WorkBuddy（AI Agent 工作台）Electron 缓存；未安装时自动跳过，不碰工作空间与登录
+  targets:
+    - os: [windows]
+      paths:
+        - "${APPDATA}/WorkBuddy/Cache"
+        - "${APPDATA}/WorkBuddy/Code Cache"
+        - "${APPDATA}/WorkBuddy/GPUCache"
+        - "${APPDATA}/WorkBuddy/CachedData"
+        - "${APPDATA}/WorkBuddy/logs"
+        - "${LOCALAPPDATA}/WorkBuddy/Cache"
+        - "${LOCALAPPDATA}/WorkBuddy/GPUCache"
+    - os: [macos]
+      paths:
+        - "${HOME}/Library/Application Support/WorkBuddy/Cache"
+        - "${HOME}/Library/Application Support/WorkBuddy/Code Cache"
+        - "${HOME}/Library/Application Support/WorkBuddy/GPUCache"
+        - "${HOME}/Library/Caches/WorkBuddy"
+
+- id: ai.codebuddy
+  name: 腾讯 CodeBuddy 缓存
+  category: ai
+  risk: L1
+  os: [windows, macos]
+  default_selected: true
+  delete: permanent
+  description: 腾讯 CodeBuddy（AI 编程 IDE，VS Code 内核）缓存族；未安装时自动跳过，不碰设置与会话
+  targets:
+    - os: [windows]
+      paths:
+        - "${APPDATA}/CodeBuddy/Cache"
+        - "${APPDATA}/CodeBuddy/CachedData"
+        - "${APPDATA}/CodeBuddy/Code Cache"
+        - "${APPDATA}/CodeBuddy/GPUCache"
+        - "${APPDATA}/CodeBuddy/logs"
+        - "${APPDATA}/CodeBuddy/CachedExtensionVSIXs"
+    - os: [macos]
+      paths:
+        - "${HOME}/Library/Application Support/CodeBuddy/Cache"
+        - "${HOME}/Library/Application Support/CodeBuddy/CachedData"
+        - "${HOME}/Library/Application Support/CodeBuddy/Code Cache"
+        - "${HOME}/Library/Application Support/CodeBuddy/GPUCache"
+        - "${HOME}/Library/Application Support/CodeBuddy/logs"
+
+- id: ai.zcode
+  name: ZCode 日志
+  category: ai
+  risk: L1
+  os: [windows, macos]
+  default_selected: true
+  delete: permanent
+  description: ZCode（Z.ai）桌面端/CLI 日志与 zai-mcp 日志，不碰配置、skills 与会话
+  targets:
+    - os: [windows, macos]
+      paths:
+        - "${HOME}/.zcode/logs"
+    - os: [windows, macos]
+      paths: ["${HOME}/.zai"]
+      include: ["*.log"]
+
+- id: ai.zcode_exec
+  name: ZCode 历史任务终端输出
+  category: ai
+  risk: L1
+  os: [windows, macos]
+  default_selected: false
+  delete: permanent
+  description: ~/.zcode/cli/exec 保存历史任务的终端命令输出，从不自动清理、会持续增长；官方 FAQ 确认可删，代价是无法回看历史任务的终端输出，配置与会话不受影响
+  targets:
+    - os: [windows, macos]
+      paths:
+        - "${HOME}/.zcode/cli/exec"
+
+- id: ai.claude_code
+  name: Claude Code CLI 缓存
+  category: ai
+  risk: L1
+  os: [windows, macos]
+  default_selected: true
+  delete: permanent
+  description: Claude Code 命令行的缓存、粘贴板缓存、shell 快照与遥测；不碰 projects/sessions 会话历史与登录配置
+  targets:
+    - os: [windows, macos]
+      paths:
+        - "${HOME}/.claude/cache"
+        - "${HOME}/.claude/paste-cache"
+        - "${HOME}/.claude/shell-snapshots"
+        - "${HOME}/.claude/telemetry"
+    - os: [windows]
+      paths:
+        - "${LOCALAPPDATA}/claude-cli-nodejs/Cache"
+    - os: [macos]
+      paths:
+        - "${HOME}/Library/Caches/claude-cli-nodejs/Cache"
+
+- id: ai.codex_cli
+  name: OpenAI Codex CLI 缓存
+  category: ai
+  risk: L1
+  os: [windows, macos]
+  default_selected: true
+  delete: permanent
+  description: Codex CLI 的缓存与临时目录；不碰 sessions、memories、skills 与登录
+  targets:
+    - os: [windows, macos]
+      paths:
+        - "${HOME}/.codex/cache"
+        - "${HOME}/.codex/tmp"
+        - "${HOME}/.codex/.tmp"
+
+- id: ai.copilot_cli
+  name: GitHub Copilot CLI 日志
+  category: ai
+  risk: L1
+  os: [windows, macos]
+  default_selected: true
+  delete: permanent
+  description: GitHub Copilot 命令行日志，不碰 config.json 配置
+  targets:
+    - os: [windows, macos]
+      paths:
+        - "${HOME}/.copilot/logs"
+
+- id: ai.bito
+  name: Bito 本地代码索引
+  category: ai
+  risk: L1
+  os: [windows, macos]
+  default_selected: true
+  delete: permanent
+  description: Bito AI 的本地代码搜索索引与日志，会在使用时自动重建
+  targets:
+    - os: [windows, macos]
+      paths:
+        - "${HOME}/.bito/localcodesearch/index"
+        - "${HOME}/.bito/localcodesearch/log"
+
+- id: ai.lingma_cli
+  name: 通义灵码 CLI 性能日志
+  category: ai
+  risk: L1
+  os: [windows, macos]
+  default_selected: true
+  delete: permanent
+  description: 通义灵码（Lingma）命令行 profiler 性能数据，不碰配置与工作区
+  targets:
+    - os: [windows]
+      paths:
+        - "${LOCALAPPDATA}/.lingma/profiler"
+    - os: [macos]
+      paths:
+        - "${HOME}/.lingma/profiler"

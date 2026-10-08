@@ -1,0 +1,143 @@
+# 系统级临时文件、缓存与日志
+- id: system.temp.user
+  name: 用户临时文件
+  category: system
+  risk: L1
+  os: [windows, macos]
+  default_selected: true
+  delete: permanent
+  description: 程序运行产生的临时文件，正在被占用的会自动跳过
+  targets:
+    - os: [windows, macos]
+      paths: ["${TEMP}"]
+
+- id: system.temp.windows
+  name: Windows 系统临时目录
+  category: system
+  risk: L2
+  os: [windows]
+  default_selected: false
+  delete: permanent
+  description: C:\\Windows\\Temp，需要管理员权限，未提权时只能清理其中可访问的部分
+  targets:
+    - os: [windows]
+      paths: ["${WINDIR}/Temp"]
+
+- id: system.windows_update
+  name: Windows 更新下载缓存
+  category: system
+  risk: L2
+  os: [windows]
+  default_selected: false
+  delete: permanent
+  description: 已安装更新的下载残留；清理前自动停止 wuauserv/BITS 服务，清理后恢复原状态，需要管理员权限
+  services:
+    os: [windows]
+    stop: [wuauserv, bits]
+    restart: true
+  targets:
+    - os: [windows]
+      paths:
+        - "${WINDIR}/SoftwareDistribution/Download"
+        - "${PROGRAMDATA}/Microsoft/Windows/DeliveryOptimization/Cache"
+
+- id: system.thumbcache
+  name: 缩略图缓存
+  category: system
+  risk: L1
+  os: [windows]
+  default_selected: true
+  delete: permanent
+  description: 资源管理器缩略图，删除后会自动重建
+  targets:
+    - os: [windows]
+      paths: ["${LOCALAPPDATA}/Microsoft/Windows/Explorer"]
+      include: ["thumbcache_*.db", "iconcache_*.db"]
+
+- id: system.wer_user
+  name: 错误报告（用户）
+  category: system
+  risk: L1
+  os: [windows]
+  default_selected: true
+  delete: permanent
+  description: 程序崩溃错误报告队列
+  targets:
+    - os: [windows]
+      paths: ["${LOCALAPPDATA}/Microsoft/Windows/WER"]
+
+- id: system.wer_system
+  name: 错误报告（系统）
+  category: system
+  risk: L2
+  os: [windows]
+  default_selected: false
+  delete: permanent
+  description: 系统级错误报告，需要管理员权限
+  targets:
+    - os: [windows]
+      paths: ["${PROGRAMDATA}/Microsoft/Windows/WER"]
+
+- id: system.dumps
+  name: 蓝屏转储与 Minidump
+  category: system
+  risk: L1
+  os: [windows]
+  default_selected: true
+  delete: permanent
+  description: MEMORY.DMP 可能达数 GB；若正在排查蓝屏问题请保留
+  targets:
+    - os: [windows]
+      paths:
+        - "${WINDIR}/Minidump"
+        - "${WINDIR}/MEMORY.DMP"
+
+- id: system.windows_logs
+  name: Windows 系统日志
+  category: system
+  risk: L2
+  os: [windows]
+  default_selected: false
+  delete: permanent
+  description: C:\\Windows\\Logs，需要管理员权限
+  targets:
+    - os: [windows]
+      paths: ["${WINDIR}/Logs"]
+
+- id: system.prefetch
+  name: Prefetch 预读取
+  category: system
+  risk: L1
+  os: [windows]
+  default_selected: false
+  delete: permanent
+  description: 收益很小，清理后近期程序首次启动会略慢
+  targets:
+    - os: [windows]
+      paths: ["${WINDIR}/Prefetch"]
+      include: ["*.pf"]
+
+- id: system.macos_user_caches
+  name: 用户应用缓存（~/Library/Caches）
+  category: system
+  risk: L1
+  os: [macos]
+  default_selected: true
+  delete: permanent
+  description: 各应用在用户目录下的缓存，会按需自动重建
+  targets:
+    - os: [macos]
+      paths: ["${HOME}/Library/Caches"]
+
+- id: system.macos_user_logs
+  name: 用户日志与崩溃报告
+  category: system
+  risk: L1
+  os: [macos]
+  default_selected: true
+  delete: permanent
+  description: ~/Library/Logs 与 DiagnosticReports
+  targets:
+    - os: [macos]
+      paths:
+        - "${HOME}/Library/Logs/DiagnosticReports"

@@ -1,0 +1,15 @@
+/* 浮窗窗口专用样式（主窗口不受影响）。
+   浮窗依赖透明背景：未加载 App.vue 的浮窗窗口中 body 不能保留默认白底，
+   否则透明无边框窗口四周会出现白边。
+   主窗口的背景与重置由 theme.css 提供。 */
+body.float-body,
+body.float-body #app {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}

@@ -1,0 +1,51 @@
+[package]
+name = "cclean"
+version = "0.1.0"
+description = "CClean - cross-platform disk cache cleaner and usage monitor"
+authors = ["CClean"]
+edition = "2021"
+
+[lib]
+name = "cclean_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-single-instance = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-autostart = "2"
+tauri-plugin-updater = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+walkdir = "2"
+rayon = "1"
+dirs = "6"
+glob = "0.3"
+regex = "1"
+thiserror = "2"
+chrono = { version = "0.4", features = ["serde"] }
+rust-embed = "8"
+sysinfo = "0.33"
+trash = "3"
+libc = "0.2"
+rusqlite = { version = "0.31", features = ["bundled"] }
+notify = "6"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = [
+  "Win32_Foundation",
+  "Win32_Security",
+  "Win32_System_Threading",
+] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true
