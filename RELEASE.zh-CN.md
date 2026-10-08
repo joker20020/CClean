@@ -9,7 +9,7 @@
 $env:TAURI_SIGNING_PRIVATE_KEY = "$env:USERPROFILE\.tauri\cclean.key"
 pnpm tauri build --bundles nsis
 # 产物：src-tauri/target/release/bundle/nsis/CClean_0.1.0_x64-setup.exe
-# 同时生成自动更新用的签名文件：CClean_0.1.0_x64-setup.nsis.zip + .sig
+# Tauri 2 直接对安装包签名，同时生成：CClean_0.1.0_x64-setup.exe.sig
 ```
 
 ```bash
@@ -41,9 +41,10 @@ pnpm tauri build --bundles dmg
 2. 更新端点已配置为 GitHub Releases：`https://github.com/joker20020/CClean/releases/latest/download/latest.json`（最新正式 Release 的同名资产）；
 3. 发布新版本：修改 `tauri.conf.json` 与 `Cargo.toml` 的版本号 → 带 `TAURI_SIGNING_PRIVATE_KEY` 环境变量执行 `pnpm tauri build`；
 4. 在 GitHub Releases 上传：
-   - `CClean_<ver>_x64-setup.nsis.zip`（注意是 zip，不是裸 exe）及其 `.sig`；
-   - `CClean_<ver>_x64-setup.exe`（供手动下载）；
-5. 发布说明里附带 `latest.json`（Tauri 模板）：
+   - `CClean_<ver>_x64-setup.exe`（安装包，同时作为自动更新载荷）；
+   - `CClean_<ver>_x64-setup.exe.sig`（签名文件）；
+   - `latest.json`（更新清单）；
+5. `latest.json` 模板（Tauri 2 的更新载荷即签名后的安装包 exe）：
 
 ```json
 {
@@ -53,7 +54,7 @@ pnpm tauri build --bundles dmg
   "platforms": {
     "windows-x86_64": {
       "signature": "<.sig 文件内容>",
-      "url": "https://github.com/OWNER/CClean/releases/download/v0.2.0/CClean_0.2.0_x64-setup.nsis.zip"
+      "url": "https://github.com/joker20020/CClean/releases/download/v0.2.0/CClean_0.2.0_x64-setup.exe"
     }
   }
 }

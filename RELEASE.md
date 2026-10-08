@@ -15,9 +15,8 @@ downloaded automatically by Tauri on first build (network required).
 $env:TAURI_SIGNING_PRIVATE_KEY = "$env:USERPROFILE\.tauri\cclean.key"
 pnpm tauri build --bundles nsis
 # Output: src-tauri/target/release/bundle/nsis/CClean_0.1.0_x64-setup.exe
-# Updater artifacts are produced next to it:
-#   CClean_0.1.0_x64-setup.nsis.zip
-#   CClean_0.1.0_x64-setup.nsis.zip.sig
+# Updater signature (Tauri 2 signs the installer itself):
+#   CClean_0.1.0_x64-setup.exe.sig
 ```
 
 ```bash
@@ -65,10 +64,10 @@ Before public release:
 3. Read the signature:
 
    ```powershell
-   $sig = Get-Content "src-tauri/target/release/bundle/nsis/CClean_<ver>_x64-setup.nsis.zip.sig" -Raw
+   $sig = Get-Content "src-tauri/target/release/bundle/nsis/CClean_<ver>_x64-setup.exe.sig" -Raw
    ```
 
-4. Create `latest.json` (the download URL must point at the `.nsis.zip`, **not** the bare `.exe`):
+4. Create `latest.json` (on Tauri 2 the updater downloads the signed NSIS installer `.exe` directly):
 
    ```json
    {
@@ -78,16 +77,15 @@ Before public release:
      "platforms": {
        "windows-x86_64": {
          "signature": "<full contents of the .sig file>",
-         "url": "https://github.com/joker20020/CClean/releases/download/v0.2.0/CClean_0.2.0_x64-setup.nsis.zip"
+         "url": "https://github.com/joker20020/CClean/releases/download/v0.2.0/CClean_0.2.0_x64-setup.exe"
        }
      }
    }
    ```
 
 5. Publish the GitHub Release `v<ver>` and upload three assets:
-   - `CClean_<ver>_x64-setup.nsis.zip` (updater payload)
-   - `CClean_<ver>_x64-setup.nsis.zip.sig` (for verification/reference)
-   - `CClean_<ver>_x64-setup.exe` (manual download)
+   - `CClean_<ver>_x64-setup.exe` (installer and updater payload)
+   - `CClean_<ver>_x64-setup.exe.sig` (signature, for reference)
    - `latest.json` (manifest consumed by the endpoint above)
 
    With the GitHub CLI:
@@ -95,8 +93,7 @@ Before public release:
    ```powershell
    gh release create v0.2.0 `
      CClean_0.2.0_x64-setup.exe `
-     CClean_0.2.0_x64-setup.nsis.zip `
-     CClean_0.2.0_x64-setup.nsis.zip.sig `
+     CClean_0.2.0_x64-setup.exe.sig `
      latest.json `
      --title "v0.2.0" --notes "Release notes"
    ```
