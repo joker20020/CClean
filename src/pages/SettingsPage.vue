@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { check } from "@tauri-apps/plugin-updater";
+import { getVersion } from "@tauri-apps/api/app";
 import {
   getPrivilegeStatus,
   getSettings,
@@ -12,11 +14,15 @@ import {
   type Settings,
 } from "../api";
 import { changeTheme, type ThemeMode } from "../utils/theme";
+import { changeLanguage, type LanguagePref } from "../i18n";
+
+const { t } = useI18n();
 
 const settings = ref<Settings | null>(null);
 const saving = ref(false);
-const savedTip = ref("");
+const savedTip = ref(false);
 const errorMsg = ref("");
+const appVersion = ref("");
 
 const privilege = ref<PrivilegeStatus | null>(null);
 const elevating = ref(false);
@@ -24,11 +30,11 @@ const elevateMsg = ref("");
 
 async function elevate() {
   elevating.value = true;
-  elevateMsg.value = "正在请求管理员权限，请在系统弹窗中点击“是”…";
+  elevateMsg.value = t("settings.privilege.requesting");
   try {
     await relaunchElevated();
   } catch (e) {
-    elevateMsg.value = `提权未完成：${String(e)}`;
+    elevateMsg.value = t("settings.privilege.failed", { msg: String(e) });
     elevating.value = false;
   }
 }
@@ -39,12 +45,23 @@ const thresholds = [5, 10, 15, 20];
 async function load() {
   settings.value = await getSettings();
   privilege.value = await getPrivilegeStatus();
+  try {
+    appVersion.value = await getVersion();
+  } catch {
+    // 非 Tauri 环境下忽略
+  }
 }
 
 async function pickTheme(mode: ThemeMode) {
   if (!settings.value) return;
   settings.value.theme = mode;
   await changeTheme(mode);
+}
+
+async function pickLanguage(pref: LanguagePref) {
+  if (!settings.value) return;
+  settings.value.language = pref;
+  await changeLanguage(pref);
 }
 
 async function toggleFloat(enabled: boolean) {
@@ -70,27 +87,30 @@ const updating = ref(false);
 
 async function checkUpdate() {
   updating.value = true;
-  updateMsg.value = "正在检查更新…";
+  updateMsg.value = t("settings.about.checking");
   try {
     const update = await check();
     if (!update) {
-      updateMsg.value = "当前已是最新版本";
+      updateMsg.value = t("settings.about.upToDate");
       return;
     }
-    updateMsg.value = `发现新版本 ${update.version}，正在下载安装…`;
+    updateMsg.value = t("settings.about.found", { version: update.version });
     await update.downloadAndInstall((event) => {
       if (event.event === "Started") {
-        updateMsg.value = `正在下载新版本 ${update.version}…`;
+        updateMsg.value = t("settings.about.downloading", { version: update.version });
       } else if (event.event === "Progress") {
         const mb = (event.data.chunkLength / (1024 * 1024)).toFixed(1);
-        updateMsg.value = `正在下载新版本 ${update.version}… 已下载 ${mb} MB`;
+        updateMsg.value = t("settings.about.downloadingProgress", {
+          version: update.version,
+          mb,
+        });
       } else if (event.event === "Finished") {
-        updateMsg.value = "下载完成，正在安装…";
+        updateMsg.value = t("settings.about.installing");
       }
     });
-    updateMsg.value = "更新已安装，请退出并重新启动 CClean";
+    updateMsg.value = t("settings.about.installed");
   } catch (e) {
-    updateMsg.value = `检查更新失败：${String(e)}（发布地址未配置或无网络时会出现）`;
+    updateMsg.value = t("settings.about.failed", { msg: String(e) });
   } finally {
     updating.value = false;
   }
@@ -98,12 +118,12 @@ async function checkUpdate() {
 
 async function save(updates: Record<string, string>) {
   saving.value = true;
-  savedTip.value = "";
+  savedTip.value = false;
   errorMsg.value = "";
   try {
     settings.value = await setSettings(updates);
-    savedTip.value = "已保存";
-    setTimeout(() => (savedTip.value = ""), 2000);
+    savedTip.value = true;
+    setTimeout(() => (savedTip.value = false), 2000);
   } catch (e) {
     errorMsg.value = String(e);
   } finally {
@@ -115,24 +135,25 @@ onMounted(load);
 </script>
 
 <template>
-  <div v-if="!settings" class="panel loading-panel">加载中…</div>
+  <div v-if="!settings" class="panel loading-panel">{{ t("settings.loading") }}</div>
   <template v-else>
     <div v-if="errorMsg" class="panel error-panel">{{ errorMsg }}</div>
 
     <!-- 权限 -->
     <div class="panel">
-      <div class="panel-title">权限</div>
+      <div class="panel-title">{{ t("settings.privilege.title") }}</div>
       <div v-if="privilege" class="row">
         <div class="label">
           <div class="row-head">
-            当前权限
+            {{ t("settings.privilege.current") }}
             <span :class="privilege.elevated ? 'badge badge-admin' : 'badge badge-user'">
-              {{ privilege.elevated ? "管理员权限运行中" : "标准权限运行中" }}
+              {{ privilege.elevated
+                ? t("settings.privilege.admin")
+                : t("settings.privilege.user") }}
             </span>
           </div>
           <div class="muted row-desc">
-            标准权限下会自动跳过 C:\Windows\Temp、Prefetch、Windows 更新缓存等受保护位置；
-            提权后可清理这些位置。提权仅在本次运行有效，重启应用后恢复标准权限
+            {{ t("settings.privilege.desc") }}
           </div>
         </div>
         <button
@@ -141,26 +162,43 @@ onMounted(load);
           :disabled="elevating"
           @click="elevate"
         >
-          {{ elevating ? "等待授权…" : "以管理员身份重启" }}
+          {{ elevating ? t("settings.privilege.waiting") : t("settings.privilege.elevate") }}
         </button>
-        <span v-else-if="privilege.elevated" class="saved-text">已具备完整清理权限</span>
+        <span v-else-if="privilege.elevated" class="saved-text">{{ t("settings.privilege.fullPerms") }}</span>
       </div>
       <div v-if="elevateMsg" class="muted tip">{{ elevateMsg }}</div>
     </div>
 
     <!-- 外观 -->
     <div class="panel">
-      <div class="panel-title">外观</div>
+      <div class="panel-title">{{ t("settings.appearance.title") }}</div>
       <div class="row">
         <div class="label">
-          <div class="row-head">主题</div>
-          <div class="muted row-desc">浅色、深色或跟随系统外观自动切换</div>
+          <div class="row-head">{{ t("settings.appearance.theme") }}</div>
+          <div class="muted row-desc">{{ t("settings.appearance.themeDesc") }}</div>
         </div>
         <div class="seg theme-seg">
-          <button :class="{ active: settings.theme === 'light' }" @click="pickTheme('light')">浅色</button>
-          <button :class="{ active: settings.theme === 'dark' }" @click="pickTheme('dark')">深色</button>
+          <button :class="{ active: settings.theme === 'light' }" @click="pickTheme('light')">{{ t("settings.appearance.light") }}</button>
+          <button :class="{ active: settings.theme === 'dark' }" @click="pickTheme('dark')">{{ t("settings.appearance.dark") }}</button>
           <button :class="{ active: settings.theme === 'system' }" @click="pickTheme('system')">
-            跟随系统
+            {{ t("settings.appearance.system") }}
+          </button>
+        </div>
+      </div>
+      <div class="row">
+        <div class="label">
+          <div class="row-head">{{ t("settings.appearance.language") }}</div>
+          <div class="muted row-desc">{{ t("settings.appearance.languageDesc") }}</div>
+        </div>
+        <div class="seg theme-seg">
+          <button :class="{ active: settings.language === 'zh-CN' }" @click="pickLanguage('zh-CN')">
+            {{ t("settings.appearance.langZh") }}
+          </button>
+          <button :class="{ active: settings.language === 'en-US' }" @click="pickLanguage('en-US')">
+            {{ t("settings.appearance.langEn") }}
+          </button>
+          <button :class="{ active: settings.language === 'system' }" @click="pickLanguage('system')">
+            {{ t("settings.appearance.langSystem") }}
           </button>
         </div>
       </div>
@@ -168,12 +206,12 @@ onMounted(load);
 
     <!-- 后台与监控 -->
     <div class="panel">
-      <div class="panel-title">后台与监控</div>
+      <div class="panel-title">{{ t("settings.background.title") }}</div>
       <div class="row">
         <div class="label">
-          <div class="row-head">常驻后台（系统托盘）</div>
+          <div class="row-head">{{ t("settings.background.resident") }}</div>
           <div class="muted row-desc">
-            关闭主窗口后最小化到托盘，继续定时快照与低空间监控
+            {{ t("settings.background.residentDesc") }}
           </div>
         </div>
         <label class="switch">
@@ -187,8 +225,8 @@ onMounted(load);
       </div>
       <div class="row">
         <div class="label">
-          <div class="row-head">开机自启</div>
-          <div class="muted row-desc">登录系统后自动启动 CClean（建议与常驻后台同时开启）</div>
+          <div class="row-head">{{ t("settings.background.autostart") }}</div>
+          <div class="muted row-desc">{{ t("settings.background.autostartDesc") }}</div>
         </div>
         <label class="switch">
           <input
@@ -201,40 +239,40 @@ onMounted(load);
       </div>
       <div class="row">
         <div class="label">
-          <div class="row-head">自动快照间隔</div>
-          <div class="muted row-desc">后台静默扫描全部规则并记录占用，用于趋势对比</div>
+          <div class="row-head">{{ t("settings.background.interval") }}</div>
+          <div class="muted row-desc">{{ t("settings.background.intervalDesc") }}</div>
         </div>
         <select
           :value="settings.snapshotIntervalHours"
           @change="save({ snapshot_interval_hours: String(($event.target as HTMLSelectElement).value) })"
         >
-          <option v-for="h in intervals" :key="h" :value="h">每 {{ h }} 小时</option>
+          <option v-for="h in intervals" :key="h" :value="h">{{ t("settings.background.everyHours", { h }) }}</option>
         </select>
       </div>
       <div class="row">
         <div class="label">
-          <div class="row-head">低空间告警阈值</div>
+          <div class="row-head">{{ t("settings.background.threshold") }}</div>
           <div class="muted row-desc">
-            系统盘剩余比例低于该值时发送系统通知（默认每小时最多一次，可在仪表盘提示条暂缓 12 小时）
+            {{ t("settings.background.thresholdDesc") }}
           </div>
         </div>
         <select
           :value="settings.lowSpaceThresholdPct"
           @change="save({ low_space_threshold_pct: String(($event.target as HTMLSelectElement).value) })"
         >
-          <option v-for="p in thresholds" :key="p" :value="p">剩余 {{ p }}%</option>
+          <option v-for="p in thresholds" :key="p" :value="p">{{ t("settings.background.thresholdOption", { p }) }}</option>
         </select>
       </div>
     </div>
 
     <!-- 桌面浮窗 -->
     <div class="panel">
-      <div class="panel-title">桌面浮窗</div>
+      <div class="panel-title">{{ t("settings.float.title") }}</div>
       <div class="row">
         <div class="label">
-          <div class="row-head">显示浮窗</div>
+          <div class="row-head">{{ t("settings.float.enabled") }}</div>
           <div class="muted row-desc">
-            桌面置顶的迷你窗口，实时显示系统盘剩余空间；可拖动，靠近屏幕左右边缘自动吸附
+            {{ t("settings.float.enabledDesc") }}
           </div>
         </div>
         <label class="switch">
@@ -248,9 +286,9 @@ onMounted(load);
       </div>
       <div class="row">
         <div class="label">
-          <div class="row-head">浮窗鼠标穿透</div>
+          <div class="row-head">{{ t("settings.float.through") }}</div>
           <div class="muted row-desc">
-            开启后鼠标点击会穿过浮窗（适合只看不动）；恢复请用托盘菜单或本开关
+            {{ t("settings.float.throughDesc") }}
           </div>
         </div>
         <label class="switch">
@@ -264,37 +302,36 @@ onMounted(load);
       </div>
       <div class="row">
         <div class="label">
-          <div class="row-head">默认删除方式</div>
-          <div class="muted row-desc">永久删除不可恢复；移入回收站可反悔（清理页仍可逐项切换）</div>
+          <div class="row-head">{{ t("settings.float.deleteMode") }}</div>
+          <div class="muted row-desc">{{ t("settings.float.deleteModeDesc") }}</div>
         </div>
         <select
           :value="settings.defaultDeleteMode"
           @change="save({ default_delete_mode: ($event.target as HTMLSelectElement).value })"
         >
-          <option value="permanent">永久删除</option>
-          <option value="recycle">移入回收站</option>
+          <option value="permanent">{{ t("settings.float.permanent") }}</option>
+          <option value="recycle">{{ t("settings.float.recycle") }}</option>
         </select>
       </div>
     </div>
 
     <!-- 关于 -->
     <div class="panel">
-      <div class="panel-title">关于与更新</div>
+      <div class="panel-title">{{ t("settings.about.title") }}</div>
       <div class="row">
         <div class="label">
-          <div class="row-head">版本更新</div>
+          <div class="row-head">{{ t("settings.about.version") }}</div>
           <div class="muted row-desc">
-            当前 v0.1.0。更新源在 tauri.conf.json 的 plugins.updater.endpoints 配置，
-            发布新版本后可在此一键下载安装
+            {{ t("settings.about.versionDesc", { version: appVersion }) }}
           </div>
         </div>
         <button class="btn btn-primary" :disabled="updating" @click="checkUpdate">
-          {{ updating ? "处理中…" : "检查更新" }}
+          {{ updating ? t("settings.about.processing") : t("settings.about.check") }}
         </button>
       </div>
       <div v-if="updateMsg" class="muted tip">{{ updateMsg }}</div>
-      <div v-if="saving" class="muted tip">保存中…</div>
-      <div v-else-if="savedTip" class="saved-text tip">✓ {{ savedTip }}</div>
+      <div v-if="saving" class="muted tip">{{ t("common.saving") }}</div>
+      <div v-else-if="savedTip" class="saved-text tip">✓ {{ t("common.saved") }}</div>
     </div>
   </template>
 </template>

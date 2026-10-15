@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import {
   customRulesDir,
   deleteCustomRule,
@@ -11,7 +12,11 @@ import {
   type RuleInfo,
   type UserRuleFile,
 } from "../api";
-import { CATEGORY_NAMES } from "../utils/format";
+import { useCategoryNames } from "../i18n";
+import { confirmDialog } from "../components/confirm";
+
+const { t, locale } = useI18n();
+const categoryNames = useCategoryNames();
 
 const builtinRules = ref<RuleInfo[]>([]);
 const userFiles = ref<UserRuleFile[]>([]);
@@ -26,21 +31,7 @@ const validateMsg = ref("");
 const validateOk = ref(false);
 const saving = ref(false);
 
-const TEMPLATE = `# 自定义清理规则（单条或数组均可）
-# 路径变量：\${USERPROFILE}/\${HOME} \${LOCALAPPDATA} \${APPDATA} \${TEMP} \${WINDIR} \${PROGRAMDATA}
-# 路径必须落在白名单目录内（缓存/临时目录），系统目录与个人文档目录会被拒绝
-- id: apps.myapp_cache          # 全局唯一，不能与内置规则重名
-  name: 我的应用缓存
-  category: apps                # system | browser | dev | ai | apps | gpu
-  risk: L1                      # L1 可清理；只报告用 L0 + action: report
-  os: [windows]                 # windows | macos；留空表示全平台
-  default_selected: false
-  delete: permanent             # permanent | recycle
-  description: 示例规则，清理某应用的缓存目录
-  targets:
-    - paths:
-        - "\${LOCALAPPDATA}/MyApp/Cache"
-`;
+const TEMPLATE = computed(() => t("rules.template"));
 
 const groupedBuiltin = computed(() => {
   const groups = new Map<string, RuleInfo[]>();
@@ -50,7 +41,7 @@ const groupedBuiltin = computed(() => {
   }
   return [...groups.entries()].map(([cat, list]) => ({
     category: cat,
-    name: CATEGORY_NAMES[cat] ?? cat,
+    name: categoryNames.value[cat] ?? cat,
     list,
   }));
 });
@@ -73,7 +64,7 @@ async function loadAll() {
 function newRule() {
   isEditing.value = true;
   editingFilename.value = "";
-  editorContent.value = TEMPLATE;
+  editorContent.value = TEMPLATE.value;
   validateMsg.value = "";
   validateOk.value = false;
 }
@@ -90,7 +81,10 @@ async function validate() {
   try {
     const ids = await validateCustomRule(editorContent.value);
     validateOk.value = true;
-    validateMsg.value = `校验通过：${ids.length} 条规则（${ids.join("、")}）`;
+    validateMsg.value = t("rules.editor.validateOk", {
+      n: ids.length,
+      ids: ids.join(locale.value === "zh-CN" ? "、" : ", "),
+    });
   } catch (e) {
     validateOk.value = false;
     validateMsg.value = String(e);
@@ -113,7 +107,14 @@ async function save() {
 }
 
 async function remove(filename: string) {
-  if (!window.confirm(`确定删除自定义规则文件 ${filename}？`)) return;
+  const ok = await confirmDialog({
+    title: t("rules.editor.deleteTitle"),
+    message: t("rules.editor.deleteConfirm", { name: filename }),
+    confirmText: t("common.delete"),
+    cancelText: t("common.cancel"),
+    danger: true,
+  });
+  if (!ok) return;
   try {
     await deleteCustomRule(filename);
     if (editingFilename.value === filename) {
@@ -139,17 +140,17 @@ onMounted(loadAll);
     <!-- 左：规则列表 -->
     <div class="panel list-panel">
       <div class="list-head">
-        <b>规则管理</b>
-        <button class="btn btn-primary btn-sm" @click="newRule">＋ 新建规则</button>
+        <b>{{ t("rules.title") }}</b>
+        <button class="btn btn-primary btn-sm" @click="newRule">{{ t("rules.newRule") }}</button>
       </div>
 
       <div class="section">
         <div class="section-title">
-          <span>我的规则（{{ userFiles.length }}）</span>
-          <button class="link-btn" @click="openDir">打开目录</button>
+          <span>{{ t("rules.myRules", { n: userFiles.length }) }}</span>
+          <button class="link-btn" @click="openDir">{{ t("common.openDir") }}</button>
         </div>
         <div v-if="userFiles.length === 0" class="muted empty">
-          还没有自定义规则，点击右上角新建
+          {{ t("rules.noUserRules") }}
         </div>
         <div
           v-for="f in userFiles"
@@ -166,12 +167,12 @@ onMounted(loadAll);
             </svg>
             {{ f.filename }}
           </button>
-          <button class="del-btn" @click="remove(f.filename)">删除</button>
+          <button class="del-btn" @click="remove(f.filename)">{{ t("common.delete") }}</button>
         </div>
       </div>
 
       <div class="section">
-        <div class="section-title"><span>内置规则（{{ builtinRules.length }}，只读）</span></div>
+        <div class="section-title"><span>{{ t("rules.builtinRules", { n: builtinRules.length }) }}</span></div>
         <div v-for="g in groupedBuiltin" :key="g.category" class="builtin-group">
           <details>
             <summary>
@@ -182,7 +183,7 @@ onMounted(loadAll);
               <div class="builtin-line">
                 <span class="tag" :class="`tag-${r.risk}`">{{ r.risk }}</span>
                 <span class="rule-name">{{ r.name }}</span>
-                <span v-if="r.action === 'report'" class="tag tag-L0">只报告</span>
+                <span v-if="r.action === 'report'" class="tag tag-L0">{{ t("rules.reportOnly") }}</span>
               </div>
               <div class="rule-id muted">{{ r.id }}<span v-if="r.description"> · {{ r.description }}</span></div>
             </div>
@@ -196,40 +197,38 @@ onMounted(loadAll);
       <template v-if="isEditing">
         <div class="editor-head">
           <div>
-            <b>{{ editingFilename ? "编辑规则" : "新建规则" }}</b>
+            <b>{{ editingFilename ? t("rules.editor.editTitle") : t("rules.editor.newTitle") }}</b>
             <div class="muted editor-sub">
-              新文件按首条规则 id 自动命名；保存后扫描/清理立即生效，目录监听在重启后生效
+              {{ t("rules.editor.sub") }}
             </div>
           </div>
           <div class="editor-actions">
-            <button class="btn btn-ghost btn-sm" @click="validate">校验</button>
+            <button class="btn btn-ghost btn-sm" @click="validate">{{ t("rules.editor.validate") }}</button>
             <button class="btn btn-primary btn-sm" :disabled="saving" @click="save">
-              {{ saving ? "保存中…" : "保存" }}
+              {{ saving ? t("rules.editor.saving") : t("common.save") }}
             </button>
-            <button class="btn btn-ghost btn-sm" @click="isEditing = false">取消</button>
+            <button class="btn btn-ghost btn-sm" @click="isEditing = false">{{ t("rules.editor.cancel") }}</button>
           </div>
         </div>
         <textarea
           v-model="editorContent"
           class="yaml-editor"
           spellcheck="false"
-          placeholder="粘贴规则 YAML…"
+          :placeholder="t('rules.editor.placeholder')"
         ></textarea>
         <div v-if="validateMsg" :class="validateOk ? 'msg-ok' : 'msg-err'">
           {{ validateMsg }}
         </div>
         <div class="muted tips">
-          安全约束：路径只允许位于临时目录、各应用缓存目录等白名单根下；禁止 <code>..</code>
-          跳转、系统目录（System32/WinSxS/Installer）与个人文档目录；规则保存前会强制安全校验。
-          完整写法见项目根目录 <code>RULES_CONTRIBUTING.md</code>。
+          {{ t("rules.editor.tips") }}
         </div>
       </template>
       <div v-else class="placeholder">
         <div class="placeholder-icon">📝</div>
-        <p>选择左侧规则编辑，或新建一条自定义清理规则</p>
+        <p>{{ t("rules.placeholder.title") }}</p>
         <p class="muted placeholder-path">
-          规则文件目录：<code>{{ rulesDir }}</code>
-          <button class="link-btn" @click="openDir">打开</button>
+          {{ t("rules.placeholder.dir", { path: rulesDir }) }}
+          <button class="link-btn" @click="openDir">{{ t("common.open") }}</button>
         </p>
       </div>
     </div>

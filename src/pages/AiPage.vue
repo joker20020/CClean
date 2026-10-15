@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { getAiReport, openPath, type ModelGroup } from "../api";
 import { formatBytes } from "../utils/format";
+import { useReportRules } from "../i18n";
 
+const { t } = useI18n();
+const reportRules = useReportRules();
 const PREVIEW_ENTRIES = 10;
 
 const groups = ref<ModelGroup[]>([]);
@@ -46,21 +50,21 @@ onMounted(load);
 <template>
   <div class="panel toolbar">
     <div class="toolbar-info">
-      <b>AI 模型库占用（只报告，不自动删除）</b>
+      <b>{{ t("ai.title") }}</b>
       <div class="muted toolbar-sub">
-        模型通常有数 GB 至数十 GB，误删后需要重新下载；请使用官方命令或在目录中手动处理
+        {{ t("ai.subtitle") }}
       </div>
     </div>
     <div class="toolbar-right">
-      <div class="total">合计 {{ formatBytes(totalFootprint) }}</div>
+      <div class="total">{{ t("ai.total", { bytes: formatBytes(totalFootprint) }) }}</div>
       <button class="btn btn-ghost btn-sm" :disabled="loading" @click="load">
-        {{ loading ? "统计中…" : "刷新" }}
+        {{ loading ? t("ai.stats") : t("common.refresh") }}
       </button>
     </div>
   </div>
 
   <div v-if="errorMsg" class="panel error-panel">{{ errorMsg }}</div>
-  <div v-if="loading" class="panel loading-panel">正在统计模型目录…</div>
+  <div v-if="loading" class="panel loading-panel">{{ t("ai.loading") }}</div>
 
   <div v-for="g in availableGroups" :key="g.ruleId" class="collapse-card" :class="{ open: expanded[g.ruleId] !== false }">
     <div class="group-head">
@@ -69,16 +73,16 @@ onMounted(load);
           <path d="M8 5l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8"
             stroke-linecap="round" stroke-linejoin="round" />
         </svg>
-        <span class="group-name">{{ g.name }}</span>
+        <span class="group-name">{{ reportRules.name(g.ruleId, g.name) }}</span>
         <span class="group-size">{{ formatBytes(g.sizeBytes) }}</span>
       </button>
       <button v-if="g.paths[0]" class="btn btn-ghost btn-sm" @click="openDir(g.paths[0])">
-        打开目录
+        {{ t("common.openDir") }}
       </button>
     </div>
 
     <div v-show="expanded[g.ruleId] !== false" class="collapse-body ai-body">
-      <div class="muted desc">{{ g.description }}</div>
+      <div class="muted desc">{{ reportRules.description(g.ruleId, g.description) }}</div>
 
       <div v-if="g.cliOutput" class="cli">
         <div class="cli-title">ollama list</div>
@@ -91,7 +95,7 @@ onMounted(load);
             <td class="entry-name" :title="e.path">{{ e.name }}</td>
             <td class="entry-size">{{ formatBytes(e.sizeBytes) }}</td>
             <td class="entry-action">
-              <button class="link-btn" @click="openDir(e.path)">打开</button>
+              <button class="link-btn" @click="openDir(e.path)">{{ t("common.open") }}</button>
             </td>
           </tr>
         </tbody>
@@ -102,8 +106,11 @@ onMounted(load);
         @click="showAll[g.ruleId] = !showAll[g.ruleId]"
       >
         {{ showAll[g.ruleId]
-          ? "收起"
-          : `展开剩余 ${g.entries.length - PREVIEW_ENTRIES} 项（共 ${g.entries.length} 项）` }}
+          ? t("common.collapse")
+          : t("common.expandMore", {
+              rest: g.entries.length - PREVIEW_ENTRIES,
+              total: g.entries.length,
+            }) }}
       </button>
 
       <div class="guidance">
@@ -112,14 +119,14 @@ onMounted(load);
           <path d="M10 9v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
           <circle cx="10" cy="6.8" r="0.9" fill="currentColor" />
         </svg>
-        {{ g.guidance }}
+        {{ reportRules.guidance(g.ruleId, g.guidance) }}
       </div>
     </div>
   </div>
 
   <div v-if="!loading && !errorMsg && availableGroups.length === 0" class="panel empty-panel">
     <div class="empty-illustration">🧊</div>
-    未检测到本地 AI 模型库（Ollama / HuggingFace / ModelScope / LM Studio / Torch Hub）。
+    {{ t("ai.empty") }}
   </div>
 </template>
 

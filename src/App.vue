@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { listen } from "@tauri-apps/api/event";
+import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import Dashboard from "./pages/Dashboard.vue";
 import CleanPage from "./pages/CleanPage.vue";
@@ -11,20 +13,25 @@ import RulesPage from "./pages/RulesPage.vue";
 import SettingsPage from "./pages/SettingsPage.vue";
 import { getSettings, setSettings } from "./api";
 import { changeTheme, getThemeMode, type ThemeMode } from "./utils/theme";
+import ConfirmModal from "./components/ConfirmModal.vue";
+import { confirmDialog } from "./components/confirm";
+
+const { t } = useI18n();
 
 type PageKey = "dashboard" | "clean" | "ai" | "bigfiles" | "trend" | "rules" | "settings";
 
 const page = ref<PageKey>("dashboard");
 const themeMode = ref<ThemeMode>("system");
+const appVersion = ref("");
 
-const navItems: { key: PageKey; label: string; icon: string }[] = [
-  { key: "dashboard", label: "仪表盘", icon: "dashboard" },
-  { key: "clean", label: "扫描与清理", icon: "broom" },
-  { key: "ai", label: "AI 专项", icon: "sparkles" },
-  { key: "bigfiles", label: "大文件", icon: "folder" },
-  { key: "trend", label: "增长趋势", icon: "chart" },
-  { key: "rules", label: "规则管理", icon: "shield" },
-  { key: "settings", label: "设置", icon: "gear" },
+const navItems: { key: PageKey; labelKey: string; icon: string }[] = [
+  { key: "dashboard", labelKey: "app.nav.dashboard", icon: "dashboard" },
+  { key: "clean", labelKey: "app.nav.clean", icon: "broom" },
+  { key: "ai", labelKey: "app.nav.ai", icon: "sparkles" },
+  { key: "bigfiles", labelKey: "app.nav.bigfiles", icon: "folder" },
+  { key: "trend", labelKey: "app.nav.trend", icon: "chart" },
+  { key: "rules", labelKey: "app.nav.rules", icon: "shield" },
+  { key: "settings", labelKey: "app.nav.settings", icon: "gear" },
 ];
 
 function goClean() {
@@ -38,13 +45,15 @@ async function pickTheme(mode: ThemeMode) {
 
 onMounted(async () => {
   // 低空间通知（由后端常驻线程触发）
-  await listen<{ availableBytes: number; thresholdPct: number }>("low-space-alert", (e) => {
+  await listen<{ availableBytes: number; thresholdPct: number }>("low-space-alert", async (e) => {
     const gb = (e.payload.availableBytes / 1024 ** 3).toFixed(1);
-    const snooze = window.confirm(
-      `系统盘可用空间仅剩 ${gb} GB（低于 ${e.payload.thresholdPct}%）。\n\n` +
-        "点击「确定」前往扫描清理；点击「取消」12 小时内不再提醒。",
-    );
-    if (snooze) {
+    const go = await confirmDialog({
+      title: t("app.lowSpace.title"),
+      message: t("app.lowSpace.confirm", { gb, pct: e.payload.thresholdPct }),
+      confirmText: t("app.lowSpace.goClean"),
+      cancelText: t("app.lowSpace.snooze"),
+    });
+    if (go) {
       page.value = "clean";
     } else {
       invoke("snooze_low_space", { hours: 12 }).catch(() => {});
@@ -62,6 +71,11 @@ onMounted(async () => {
   });
 
   themeMode.value = getThemeMode();
+  try {
+    appVersion.value = await getVersion();
+  } catch {
+    // 非 Tauri 环境下忽略
+  }
 });
 </script>
 
@@ -78,7 +92,7 @@ onMounted(async () => {
         </span>
         <div class="brand-text">
           <div class="brand-name">CClean</div>
-          <div class="brand-sub">磁盘清理专家</div>
+          <div class="brand-sub">{{ t("app.brand.subtitle") }}</div>
         </div>
       </div>
 
@@ -137,29 +151,29 @@ onMounted(async () => {
                 stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
             </template>
           </svg>
-          <span>{{ item.label }}</span>
+          <span>{{ t(item.labelKey) }}</span>
         </button>
       </nav>
 
       <div class="sidebar-footer">
-        <div class="theme-switch" role="group" title="主题切换">
+        <div class="theme-switch" role="group" :title="t('app.themeSwitch.title')">
           <button
-            v-for="t in [
-              { k: 'light', t: '浅色' },
-              { k: 'dark', t: '深色' },
-              { k: 'system', t: '跟随系统' },
+            v-for="btn in [
+              { k: 'light', tk: 'app.themeSwitch.light' },
+              { k: 'dark', tk: 'app.themeSwitch.dark' },
+              { k: 'system', tk: 'app.themeSwitch.system' },
             ]"
-            :key="t.k"
-            :class="{ active: themeMode === t.k }"
-            :title="t.t"
-            @click="pickTheme(t.k as ThemeMode)"
+            :key="btn.k"
+            :class="{ active: themeMode === btn.k }"
+            :title="t(btn.tk)"
+            @click="pickTheme(btn.k as ThemeMode)"
           >
-            <svg v-if="t.k === 'light'" viewBox="0 0 20 20" width="15" height="15">
+            <svg v-if="btn.k === 'light'" viewBox="0 0 20 20" width="15" height="15">
               <circle cx="10" cy="10" r="3.4" fill="none" stroke="currentColor" stroke-width="1.6" />
               <path d="M10 2.5v1.8M10 15.7v1.8M17.5 10h-1.8M4.3 10H2.5M15.3 4.7l-1.3 1.3M6 14l-1.3 1.3M15.3 15.3L14 14M6 6L4.7 4.7"
                 stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
             </svg>
-            <svg v-else-if="t.k === 'dark'" viewBox="0 0 20 20" width="15" height="15">
+            <svg v-else-if="btn.k === 'dark'" viewBox="0 0 20 20" width="15" height="15">
               <path d="M15.4 11.6A6.2 6.2 0 0 1 8.4 4.6a6.2 6.2 0 1 0 7 7z" fill="currentColor" />
             </svg>
             <svg v-else viewBox="0 0 20 20" width="15" height="15">
@@ -170,7 +184,7 @@ onMounted(async () => {
             </svg>
           </button>
         </div>
-        <div class="version">v0.1.0</div>
+        <div class="version">v{{ appVersion }}</div>
       </div>
     </aside>
 
@@ -185,6 +199,9 @@ onMounted(async () => {
         <SettingsPage v-else-if="page === 'settings'" />
       </div>
     </main>
+
+    <!-- 全局模态确认框（替代浏览器原生 confirm） -->
+    <ConfirmModal />
   </div>
 </template>
 

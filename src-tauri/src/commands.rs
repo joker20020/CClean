@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Emitter, State};
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_opener::OpenerExt;
 
@@ -98,16 +98,48 @@ pub fn get_rules(state: State<'_, AppState>) -> Vec<RuleDto> {
     rules.iter().map(rule_dto).collect()
 }
 
+/// 扫描/清理进度事件载荷（按规则逐条推进）。
+#[derive(serde::Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ProgressPayload {
+    pub index: usize,
+    pub total: usize,
+    pub id: String,
+    pub name: String,
+}
+
 #[tauri::command]
 pub async fn scan(
     state: State<'_, AppState>,
+    app: AppHandle,
     rule_ids: Option<Vec<String>>,
 ) -> Result<Vec<ScanResultDto>, String> {
     let rules = state.rules.read().unwrap().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        scanner::scan_rules(&rules, rule_ids.as_deref())
-            .into_iter()
-            .map(scan_dto)
+        let targets: Vec<Rule> = rules
+            .iter()
+            .filter(|r| rule_ids.as_deref().map_or(true, |ids| ids.iter().any(|id| id == &r.id)))
+            .cloned()
+            .collect();
+        let total = targets.len();
+        // 逐条并行扫描，但每条完成后发射进度事件，前端可显示确定性进度条
+        use rayon::prelude::*;
+        targets
+            .par_iter()
+            .enumerate()
+            .map(|(i, rule)| {
+                let dto = scan_dto(scanner::scan_rule(rule));
+                let _ = app.emit(
+                    "scan-progress",
+                    ProgressPayload {
+                        index: i + 1,
+                        total,
+                        id: rule.id.clone(),
+                        name: rule.name.clone(),
+                    },
+                );
+                dto
+            })
             .collect::<Vec<_>>()
     })
     .await
@@ -117,14 +149,16 @@ pub async fn scan(
 #[tauri::command]
 pub async fn clean(
     state: State<'_, AppState>,
+    app: AppHandle,
     items: Vec<CleanItem>,
 ) -> Result<Vec<CleanOutcome>, String> {
     let rules = state.rules.read().unwrap().clone();
     let storage = state.storage.clone();
     tauri::async_runtime::spawn_blocking(move || {
+        let total = items.len();
         let mut outcomes = Vec::new();
-        for item in items {
-            let Some(rule) = rules.iter().find(|r| r.id == item.rule_id) else {
+        for (i, item) in items.into_iter().enumerate() {
+            let Some(rule) = rules.iter().find(|r| r.id == item.rule_id).cloned() else {
                 continue;
             };
             let mode = if item.mode.is_empty() {
@@ -132,7 +166,7 @@ pub async fn clean(
             } else {
                 item.mode.as_str()
             };
-            let outcome = match cleaner::clean_rule(rule, mode) {
+            let outcome = match cleaner::clean_rule(&rule, mode) {
                 Ok(o) => o,
                 Err(e) => CleanOutcome {
                     rule_id: rule.id.clone(),
@@ -160,6 +194,15 @@ pub async fn clean(
             ) {
                 eprintln!("[clean] 清理日志写入失败: {e}");
             }
+            let _ = app.emit(
+                "clean-progress",
+                ProgressPayload {
+                    index: i + 1,
+                    total,
+                    id: rule.id.clone(),
+                    name: rule.name.clone(),
+                },
+            );
             outcomes.push(outcome);
         }
         outcomes
@@ -450,6 +493,26 @@ pub fn get_fs_events(state: State<'_, AppState>, limit: Option<u32>) -> Result<V
         .map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub fn delete_clean_log(state: State<'_, AppState>, id: i64) -> Result<usize, String> {
+    state.storage.delete_clean_log(id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn clear_clean_logs(state: State<'_, AppState>) -> Result<usize, String> {
+    state.storage.clear_clean_logs().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_fs_event(state: State<'_, AppState>, id: i64) -> Result<usize, String> {
+    state.storage.delete_fs_event(id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn clear_fs_events(state: State<'_, AppState>) -> Result<usize, String> {
+    state.storage.clear_fs_events().map_err(|e| e.to_string())
+}
+
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SettingsDto {
@@ -461,6 +524,7 @@ pub struct SettingsDto {
     pub float_enabled: bool,
     pub float_click_through: bool,
     pub theme: String,
+    pub language: String,
 }
 
 fn load_settings(storage: &crate::storage::Storage) -> SettingsDto {
@@ -480,6 +544,7 @@ fn load_settings(storage: &crate::storage::Storage) -> SettingsDto {
         float_enabled: get(crate::floatwin::SETTING_FLOAT_ENABLED, "false") == "true",
         float_click_through: get(crate::floatwin::SETTING_FLOAT_THROUGH, "false") == "true",
         theme: get("theme", "system"),
+        language: get(crate::i18n::SETTING_LANGUAGE, "system"),
     }
 }
 
@@ -572,11 +637,24 @@ pub fn set_settings(
                 }
                 value.clone()
             }
+            crate::i18n::SETTING_LANGUAGE => {
+                if value != "zh-CN" && value != "en-US" && value != "system" {
+                    return Err("language 必须为 zh-CN/en-US/system".into());
+                }
+                value.clone()
+            }
             other => return Err(format!("未知设置项: {other}")),
         };
         storage
             .set_setting(key, &validated)
             .map_err(|e| e.to_string())?;
+    }
+
+    // 语言切换后重建托盘菜单，使菜单与提示立即本地化
+    if updates.contains_key(crate::i18n::SETTING_LANGUAGE) {
+        if let Err(e) = crate::build_tray(&app) {
+            eprintln!("[i18n] 托盘菜单重建失败: {e}");
+        }
     }
 
     // 常驻 / 自启联动：两者都开启时才注册开机自启

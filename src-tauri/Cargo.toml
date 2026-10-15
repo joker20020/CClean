@@ -1,6 +1,6 @@
 [package]
 name = "cclean"
-version = "0.1.0"
+version = "0.2.0"
 description = "CClean - cross-platform disk cache cleaner and usage monitor"
 authors = ["CClean"]
 edition = "2021"
@@ -41,6 +41,7 @@ windows-sys = { version = "0.61", features = [
   "Win32_Foundation",
   "Win32_Security",
   "Win32_System_Threading",
+  "Win32_Globalization",
 ] }
 
 [profile.release]

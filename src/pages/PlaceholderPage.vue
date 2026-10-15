@@ -6,10 +6,10 @@ defineProps<{ title: string; milestone: string }>();
   <div class="panel placeholder">
     <div class="ph-icon">🚧</div>
     <div class="ph-title">{{ title }}</div>
-    <div class="muted">该模块将在后续里程碑交付</div>
+    <div class="muted">{{ $t("common.comingSoon") }}</div>
     <div class="ph-milestone">{{ milestone }}</div>
     <div class="muted" style="margin-top: 18px">
-      当前 M1 已支持：规则扫描（Dry-run）、缓存清理、磁盘总览。
+      {{ $t("common.m1Ready") }}
     </div>
   </div>
 </template>

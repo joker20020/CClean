@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import * as echarts from "echarts";
 import { getSettings, getSystemOverview, snoozeLowSpace, type Overview } from "../api";
 import { formatBytes } from "../utils/format";
 import { chartColors } from "../utils/theme";
 
 const emit = defineEmits<{ (e: "go-clean"): void }>();
+
+const { t, locale } = useI18n();
 
 const overview = ref<Overview | null>(null);
 const errorMsg = ref("");
@@ -68,7 +71,7 @@ function renderGauge(o: Overview) {
           detail: {
             valueAnimation: true,
             offsetCenter: ["0", "-5%"],
-            formatter: () => `{v|${formatBytes(disk.availableBytes)}}\n{l|可用空间}`,
+            formatter: () => `{v|${formatBytes(disk.availableBytes)}}\n{l|${t("common.available")}}`,
             rich: {
               v: { fontSize: 26, fontWeight: 700, color: c.text, lineHeight: 36 },
               l: { fontSize: 13, color: c.muted },
@@ -92,6 +95,10 @@ function onThemeChange() {
 function onResize() {
   chart?.resize();
 }
+// 语言切换后重绘仪表盘（中心文字包含本地化文案）
+watch(locale, () => {
+  if (overview.value) renderGauge(overview.value);
+});
 
 onMounted(async () => {
   try {
@@ -117,7 +124,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div v-if="errorMsg" class="panel">读取系统信息失败：{{ errorMsg }}</div>
+  <div v-if="errorMsg" class="panel">{{ t("dashboard.errorRead", { msg: errorMsg }) }}</div>
   <template v-else>
     <div v-if="lowSpace" class="low-space-banner">
       <div class="banner-text">
@@ -128,38 +135,43 @@ onUnmounted(() => {
           <circle cx="10" cy="14" r="1" fill="currentColor" />
         </svg>
         <div>
-          <b>系统盘剩余空间不足：</b>
-          {{ sysDisk?.mountName }} 仅剩 {{ formatBytes(sysDisk?.availableBytes ?? 0) }}
-          （{{ freePct.toFixed(1) }}%），建议尽快清理缓存
+          <b>{{ t("dashboard.banner.title") }}</b>
+          {{ t("dashboard.banner.text", {
+            mount: sysDisk?.mountName,
+            bytes: formatBytes(sysDisk?.availableBytes ?? 0),
+            pct: freePct.toFixed(1),
+          }) }}
         </div>
       </div>
       <div class="banner-actions">
-        <button class="btn btn-primary btn-sm" @click="emit('go-clean')">去清理</button>
-        <button class="btn btn-ghost btn-sm" @click="snooze12h">12 小时内不再提醒</button>
+        <button class="btn btn-primary btn-sm" @click="emit('go-clean')">{{ t("dashboard.banner.goClean") }}</button>
+        <button class="btn btn-ghost btn-sm" @click="snooze12h">{{ t("dashboard.banner.snooze") }}</button>
       </div>
     </div>
 
     <template v-if="overview">
       <div class="top-grid">
         <div class="panel gauge-panel">
-          <div class="panel-title">系统盘可用空间</div>
+          <div class="panel-title">{{ t("dashboard.gauge.title") }}</div>
           <div ref="gaugeEl" class="gauge"></div>
           <div class="gauge-sub muted">
-            {{ systemDisk(overview)?.mountName }} ·
-            已用 {{ formatBytes(systemDisk(overview)?.usedBytes ?? 0) }} /
-            {{ formatBytes(systemDisk(overview)?.totalBytes ?? 0) }}
+            {{ t("dashboard.gauge.usedInfo", {
+              mount: systemDisk(overview)?.mountName,
+              used: formatBytes(systemDisk(overview)?.usedBytes ?? 0),
+              total: formatBytes(systemDisk(overview)?.totalBytes ?? 0),
+            }) }}
           </div>
         </div>
 
         <div class="panel disks-panel">
-          <div class="panel-title">磁盘总览</div>
+          <div class="panel-title">{{ t("dashboard.disks.title") }}</div>
           <div v-for="d in overview.disks" :key="d.mountName" class="disk-row">
             <div class="disk-head">
               <span class="disk-name">
                 <span class="disk-dot" :style="{ background: `var(--${usedPct(d) > 85 ? 'red' : usedPct(d) > 70 ? 'amber' : 'primary'})` }"></span>
                 {{ d.mountName }}
               </span>
-              <span class="muted">{{ formatBytes(d.availableBytes) }} 可用</span>
+              <span class="muted">{{ t("dashboard.disks.available", { bytes: formatBytes(d.availableBytes) }) }}</span>
             </div>
             <div class="bar">
               <div
@@ -172,27 +184,31 @@ onUnmounted(() => {
               ></div>
             </div>
             <div class="muted disk-sub">
-              {{ formatBytes(d.usedBytes) }} / {{ formatBytes(d.totalBytes) }} · {{ d.fileSystem }}
+              {{ t("dashboard.disks.usage", {
+                used: formatBytes(d.usedBytes),
+                total: formatBytes(d.totalBytes),
+                fs: d.fileSystem,
+              }) }}
             </div>
           </div>
           <div class="panel-footer">
             <span class="muted os-text">
-              {{ overview.os }}<span v-if="overview.elevated" class="elevated"> · 已提权</span>
+              {{ overview.os }}<span v-if="overview.elevated" class="elevated">{{ t("dashboard.disks.elevated") }}</span>
             </span>
-            <button class="btn btn-primary" @click="emit('go-clean')">开始扫描清理</button>
+            <button class="btn btn-primary" @click="emit('go-clean')">{{ t("dashboard.disks.startScan") }}</button>
           </div>
         </div>
       </div>
 
       <div class="panel">
-        <div class="panel-title">安全承诺</div>
+        <div class="panel-title">{{ t("dashboard.promise.title") }}</div>
         <div class="promise-grid">
           <div class="promise-item">
             <span class="promise-icon ic-green">
               <svg viewBox="0 0 20 20" width="16" height="16"><path d="M5 10.5l3.2 3.2L15 7" fill="none"
                 stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
             </span>
-            <div>只清理白名单内的可再生缓存，默认先预演（Dry-run）后清理</div>
+            <div>{{ t("dashboard.promise.p1") }}</div>
           </div>
           <div class="promise-item">
             <span class="promise-icon ic-purple">
@@ -201,7 +217,7 @@ onUnmounted(() => {
                   fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
               </svg>
             </span>
-            <div>AI 模型、个人文件、接收的聊天文件只报告、不自动删</div>
+            <div>{{ t("dashboard.promise.p2") }}</div>
           </div>
           <div class="promise-item">
             <span class="promise-icon ic-blue">
@@ -211,7 +227,7 @@ onUnmounted(() => {
                 <circle cx="10" cy="12" r="1.6" fill="currentColor" />
               </svg>
             </span>
-            <div>被占用文件自动跳过，不强杀进程；每次清理均有日志</div>
+            <div>{{ t("dashboard.promise.p3") }}</div>
           </div>
           <div class="promise-item">
             <span class="promise-icon ic-amber">
@@ -222,12 +238,12 @@ onUnmounted(() => {
                   stroke-width="1.4" stroke-linecap="round" />
               </svg>
             </span>
-            <div>回收站、Windows.old、还原点等不可逆项仅提供官方入口指引</div>
+            <div>{{ t("dashboard.promise.p4") }}</div>
           </div>
         </div>
       </div>
     </template>
-    <div v-else class="panel loading-panel">正在读取系统信息…</div>
+    <div v-else class="panel loading-panel">{{ t("dashboard.loading") }}</div>
   </template>
 </template>
 

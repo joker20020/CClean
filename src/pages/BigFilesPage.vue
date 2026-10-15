@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import * as echarts from "echarts";
 import {
   defaultRoots,
@@ -13,6 +14,7 @@ import {
 import { formatBytes } from "../utils/format";
 import { chartColors } from "../utils/theme";
 
+const { t, locale } = useI18n();
 const PAGE_SIZE = 30;
 const tab = ref<"files" | "dirs">("files");
 
@@ -139,19 +141,25 @@ watch(tab, (v) => {
 
 onMounted(async () => {
   roots.value = await defaultRoots();
-  if (roots.value.length) {
+  const buildPresets = () => {
+    if (!roots.value.length) return;
     const desktop = roots.value[0];
     const home = desktop.replace(/[\\/][^\\/]+$/, "");
     const isWin = home.includes("\\") || /^[A-Za-z]:/.test(home);
     presets.value = [
-      { label: "用户目录", path: home },
-      { label: isWin ? "C 盘根目录（较慢）" : "根目录（较慢）", path: isWin ? "C:\\" : "/" },
+      { label: t("bigfiles.preset.userHome"), path: home },
       {
-        label: isWin ? "AppData\\Local" : "~/Library",
+        label: t(isWin ? "bigfiles.preset.cRootSlow" : "bigfiles.preset.rootSlow"),
+        path: isWin ? "C:\\" : "/",
+      },
+      {
+        label: t(isWin ? "bigfiles.preset.appdataLocal" : "bigfiles.preset.library"),
         path: isWin ? `${home}\\AppData\\Local` : `${home}/Library`,
       },
     ];
-  }
+  };
+  buildPresets();
+  watch(locale, buildPresets);
   await scanFiles();
   window.addEventListener("resize", onResize);
   window.addEventListener("theme-change", onThemeChange);
@@ -161,8 +169,8 @@ onMounted(async () => {
 <template>
   <div class="panel tabs-panel">
     <div class="seg">
-      <button :class="{ active: tab === 'files' }" @click="tab = 'files'">大文件</button>
-      <button :class="{ active: tab === 'dirs' }" @click="tab = 'dirs'">目录占用</button>
+      <button :class="{ active: tab === 'files' }" @click="tab = 'files'">{{ t("bigfiles.tab.files") }}</button>
+      <button :class="{ active: tab === 'dirs' }" @click="tab = 'dirs'">{{ t("bigfiles.tab.dirs") }}</button>
     </div>
   </div>
 
@@ -173,28 +181,28 @@ onMounted(async () => {
     <div class="toolbar-row">
       <div class="seg">
         <button
-          v-for="(t, i) in thresholds"
-          :key="t.label"
+          v-for="(th, i) in thresholds"
+          :key="th.label"
           :class="{ active: thresholdIdx === i }"
           @click="thresholdIdx = i; scanFiles()"
         >
-          {{ t.label }}
+          {{ th.label }}
         </button>
       </div>
       <button class="btn btn-primary btn-sm" :disabled="scanningFiles" @click="scanFiles">
-        {{ scanningFiles ? "正在扫描…" : "重新扫描" }}
+        {{ scanningFiles ? t("bigfiles.scanning") : t("bigfiles.rescan") }}
       </button>
     </div>
     <div class="muted scan-roots">
-      扫描范围：{{ roots.join("；") || "默认用户目录" }}
+      {{ t("bigfiles.scanRange", { roots: roots.join("；") || t("bigfiles.scanRangeDefault") }) }}
     </div>
 
     <table class="data-table">
       <thead>
         <tr>
-          <th>文件</th>
-          <th style="width: 110px">大小</th>
-          <th style="width: 110px">修改时间</th>
+          <th>{{ t("bigfiles.table.file") }}</th>
+          <th style="width: 110px">{{ t("bigfiles.table.size") }}</th>
+          <th style="width: 110px">{{ t("bigfiles.table.modified") }}</th>
           <th style="width: 80px"></th>
         </tr>
       </thead>
@@ -207,7 +215,7 @@ onMounted(async () => {
           <td class="num">{{ formatBytes(f.sizeBytes) }}</td>
           <td class="num">{{ fmtDate(f.modifiedTs) }}</td>
           <td class="num">
-            <button class="link-btn" @click="locateFile(f.path)">定位</button>
+            <button class="link-btn" @click="locateFile(f.path)">{{ t("common.locate") }}</button>
           </td>
         </tr>
       </tbody>
@@ -217,10 +225,10 @@ onMounted(async () => {
       class="show-more"
       @click="fileShown += PAGE_SIZE"
     >
-      显示更多（还有 {{ files.length - fileShown }} 项）
+      {{ t("common.showMore", { n: files.length - fileShown }) }}
     </button>
     <div v-if="!scanningFiles && files.length === 0" class="muted empty">
-      未发现超过阈值的文件
+      {{ t("bigfiles.empty") }}
     </div>
   </div>
 
@@ -241,7 +249,7 @@ onMounted(async () => {
         <span class="muted root-path">{{ currentRoot }}</span>
       </div>
       <div v-if="scanningDirs" class="muted scanning-hint">
-        正在递归统计（系统盘根目录可能需要数分钟）…
+        {{ t("bigfiles.scanningDirs") }}
       </div>
       <div v-show="!scanningDirs" ref="treemapEl" class="treemap"></div>
     </div>
@@ -250,9 +258,9 @@ onMounted(async () => {
       <table class="data-table">
         <thead>
           <tr>
-            <th>名称</th>
-            <th style="width: 120px">占用</th>
-            <th style="width: 110px">文件数</th>
+            <th>{{ t("bigfiles.table.name") }}</th>
+            <th style="width: 120px">{{ t("bigfiles.table.size") }}</th>
+            <th style="width: 110px">{{ t("bigfiles.table.fileCount") }}</th>
             <th style="width: 80px"></th>
           </tr>
         </thead>
@@ -260,12 +268,12 @@ onMounted(async () => {
           <tr v-for="d in dirEntries.slice(0, dirShown)" :key="d.path">
             <td class="file-name" :title="d.path">
               {{ d.name }}
-              <span class="type-tag">{{ d.isDir ? "目录" : "文件" }}</span>
+              <span class="type-tag">{{ d.isDir ? t("bigfiles.table.typeDir") : t("bigfiles.table.typeFile") }}</span>
             </td>
             <td class="num">{{ formatBytes(d.sizeBytes) }}</td>
             <td class="num">{{ d.fileCount.toLocaleString() }}</td>
             <td class="num">
-              <button class="link-btn" @click="openDir(d.path)">打开</button>
+              <button class="link-btn" @click="openDir(d.path)">{{ t("common.open") }}</button>
             </td>
           </tr>
         </tbody>
@@ -275,7 +283,7 @@ onMounted(async () => {
         class="show-more"
         @click="dirShown += PAGE_SIZE"
       >
-        显示更多（还有 {{ dirEntries.length - dirShown }} 项）
+        {{ t("common.showMore", { n: dirEntries.length - dirShown }) }}
       </button>
     </div>
   </template>

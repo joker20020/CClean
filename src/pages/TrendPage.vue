@@ -1,8 +1,13 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import * as echarts from "echarts";
 import { listen } from "@tauri-apps/api/event";
 import {
+  clearCleanLogs,
+  clearFsEvents,
+  deleteCleanLog,
+  deleteFsEvent,
   getCleanLogs,
   getFsEvents,
   getTrend,
@@ -11,10 +16,16 @@ import {
   type FsEvent,
   type TrendData,
 } from "../api";
-import { CATEGORY_NAMES, formatBytes } from "../utils/format";
+import { formatBytes } from "../utils/format";
 import { chartColors } from "../utils/theme";
+import { useCategoryNames } from "../i18n";
+import { confirmDialog } from "../components/confirm";
 
+const { t, locale } = useI18n();
+const categoryNames = useCategoryNames();
 const PAGE_SIZE = 20;
+/** 内存中最多保留的实时事件条数（超出后丢弃最旧的） */
+const MAX_LIVE_EVENTS = 300;
 
 const trend = ref<TrendData>({ snapshots: [], items: [] });
 const logs = ref<CleanLog[]>([]);
@@ -31,6 +42,7 @@ const catChartEl = ref<HTMLDivElement | null>(null);
 let diskChart: echarts.ECharts | null = null;
 let catChart: echarts.ECharts | null = null;
 let unlisten: (() => void) | null = null;
+let unlistenFs: (() => void) | null = null;
 
 const gb = (n: number) => +(n / (1024 * 1024 * 1024)).toFixed(2);
 const fmtTime = (ts: number) => {
@@ -52,7 +64,7 @@ const categorySeries = computed(() => {
   return cats
     .filter((c) => totals.has(c))
     .map((c) => ({
-      name: CATEGORY_NAMES[c] ?? c,
+      name: categoryNames.value[c] ?? c,
       type: "line",
       smooth: true,
       symbol: "circle",
@@ -83,12 +95,12 @@ function renderCharts() {
           textStyle: { color: c.text },
         },
         grid: { left: 50, right: 20, top: 36, bottom: 40 },
-        legend: { data: ["系统盘剩余", "系统盘已用"], top: 0, textStyle: { color: c.muted } },
+        legend: { data: [t("trend.diskFree"), t("trend.diskUsed")], top: 0, textStyle: { color: c.muted } },
         xAxis: { type: "category", data: xs, ...axisCommon, splitLine: { show: false } },
         yAxis: { type: "value", name: "GB", nameTextStyle: { color: c.muted }, ...axisCommon },
         series: [
           {
-            name: "系统盘剩余",
+            name: t("trend.diskFree"),
             type: "line",
             smooth: true,
             areaStyle: { opacity: 0.12 },
@@ -98,7 +110,7 @@ function renderCharts() {
             data: trend.value.snapshots.map((s) => gb(s.disk_free)),
           },
           {
-            name: "系统盘已用",
+            name: t("trend.diskUsed"),
             type: "line",
             smooth: true,
             color: c.red,
@@ -164,17 +176,99 @@ async function snapshotNow() {
   }
 }
 
-const statusText: Record<string, string> = {
-  ok: "成功",
-  partial: "部分成功",
-  failed: "失败",
-};
-const kindText: Record<string, string> = {
-  create: "新建",
-  write: "写入",
-  delete: "删除",
-  rename: "重命名",
-};
+/** 删除单条清理记录（仅管理记录，不影响文件系统） */
+async function removeLog(id: number) {
+  try {
+    await deleteCleanLog(id);
+    logs.value = logs.value.filter((l) => l.id !== id);
+  } catch (e) {
+    errorMsg.value = String(e);
+  }
+}
+
+async function clearLogs() {
+  if (logs.value.length === 0) return;
+  const ok = await confirmDialog({
+    title: t("trend.manage.clearLogsTitle"),
+    message: t("trend.manage.clearLogsConfirm", { n: logs.value.length }),
+    confirmText: t("trend.manage.clear"),
+    cancelText: t("common.cancel"),
+    danger: true,
+  });
+  if (!ok) return;
+  try {
+    await clearCleanLogs();
+    logs.value = [];
+    logShown.value = PAGE_SIZE;
+  } catch (e) {
+    errorMsg.value = String(e);
+  }
+}
+
+/** 删除单条实时事件 */
+async function removeEvent(id: number) {
+  try {
+    await deleteFsEvent(id);
+    events.value = events.value.filter((e) => e.id !== id);
+  } catch (e) {
+    errorMsg.value = String(e);
+  }
+}
+
+async function clearEvents() {
+  if (events.value.length === 0) return;
+  const ok = await confirmDialog({
+    title: t("trend.manage.clearEventsTitle"),
+    message: t("trend.manage.clearEventsConfirm", { n: events.value.length }),
+    confirmText: t("trend.manage.clear"),
+    cancelText: t("common.cancel"),
+    danger: true,
+  });
+  if (!ok) return;
+  try {
+    await clearFsEvents();
+    events.value = [];
+    eventShown.value = PAGE_SIZE;
+  } catch (e) {
+    errorMsg.value = String(e);
+  }
+}
+
+/** 监听到的实时事件载荷（后端使用 camelCase） */
+interface FsEventPayload {
+  id: number;
+  ts: number;
+  kind: string;
+  ruleId: string;
+  path: string;
+  sizeDelta: number | null;
+}
+
+function onFsEvent(payload: FsEventPayload) {
+  const ev: FsEvent = {
+    id: payload.id,
+    ts: payload.ts,
+    kind: payload.kind,
+    rule_id: payload.ruleId,
+    path: payload.path,
+    size_delta: payload.sizeDelta,
+  };
+  // 去重（同一条事件可能已在初始加载中）
+  if (events.value.some((e) => e.id === ev.id)) return;
+  events.value = [ev, ...events.value].slice(0, MAX_LIVE_EVENTS);
+}
+
+const statusText = computed<Record<string, string>>(() => ({
+  ok: t("trend.status.ok"),
+  partial: t("trend.status.partial"),
+  failed: t("trend.status.failed"),
+}));
+const kindText = computed<Record<string, string>>(() => ({
+  create: t("trend.kind.create"),
+  write: t("trend.kind.write"),
+  delete: t("trend.kind.delete"),
+  rename: t("trend.kind.rename"),
+}));
 
 function resize() {
   diskChart?.resize();
@@ -184,14 +278,20 @@ function onThemeChange() {
   nextTick(renderCharts);
 }
 
+// 语言切换后重绘图表（图例/分类名包含本地化文案）
+watch(locale, () => nextTick(renderCharts));
+
 onMounted(async () => {
   await load();
   unlisten = await listen("snapshot-taken", () => load());
+  // 实时追加目录监听事件
+  unlistenFs = await listen<FsEventPayload>("fs-event", (e) => onFsEvent(e.payload));
   window.addEventListener("resize", resize);
   window.addEventListener("theme-change", onThemeChange);
 });
 onUnmounted(() => {
   unlisten?.();
+  unlistenFs?.();
   window.removeEventListener("resize", resize);
   window.removeEventListener("theme-change", onThemeChange);
   diskChart?.dispose();
@@ -203,51 +303,61 @@ watch(trend, () => nextTick(renderCharts));
 <template>
   <div class="panel toolbar">
     <div>
-      <b>占用增长趋势</b>
+      <b>{{ t("trend.title") }}</b>
       <div class="muted toolbar-sub">
-        快照在每次清理页扫描后/定时任务中记录；至少两个快照才能看出趋势
+        {{ t("trend.subtitle") }}
       </div>
     </div>
     <button class="btn btn-primary" :disabled="taking" @click="snapshotNow">
-      {{ taking ? "正在记录…" : "立即记录快照" }}
+      {{ taking ? t("trend.recording") : t("trend.record") }}
     </button>
   </div>
 
   <div v-if="errorMsg" class="panel error-panel">{{ errorMsg }}</div>
-  <div v-if="loading" class="panel loading-panel">加载中…</div>
+  <div v-if="loading" class="panel loading-panel">{{ t("trend.loading") }}</div>
 
   <div class="panel">
-    <div class="chart-title">系统盘容量变化（GB）</div>
+    <div class="chart-title">{{ t("trend.diskChartTitle") }}</div>
     <div ref="diskChartEl" class="chart"></div>
     <div v-if="trend.snapshots.length < 2" class="muted hint">
-      当前仅有 {{ trend.snapshots.length }} 个快照，定时快照（默认每日）后自动形成曲线
+      {{ t("trend.hint", { n: trend.snapshots.length }) }}
     </div>
   </div>
 
   <div class="panel">
-    <div class="chart-title">各类缓存占用变化（GB）</div>
+    <div class="chart-title">{{ t("trend.catChartTitle") }}</div>
     <div ref="catChartEl" class="chart"></div>
   </div>
 
   <!-- 清理记录（可折叠） -->
   <div class="collapse-card" :class="{ open: sectionsOpen.logs }">
-    <button class="collapse-head" @click="sectionsOpen.logs = !sectionsOpen.logs">
-      <svg class="collapse-chevron" viewBox="0 0 20 20" width="14" height="14">
-        <path d="M8 5l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8"
-          stroke-linecap="round" stroke-linejoin="round" />
-      </svg>
-      清理记录
-      <span class="section-count">{{ logs.length }}</span>
-    </button>
+    <div class="section-head">
+      <button class="collapse-head" @click="sectionsOpen.logs = !sectionsOpen.logs">
+        <svg class="collapse-chevron" viewBox="0 0 20 20" width="14" height="14">
+          <path d="M8 5l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8"
+            stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        {{ t("trend.logsTitle") }}
+        <span class="section-count">{{ logs.length }}</span>
+      </button>
+      <button
+        v-if="sectionsOpen.logs && logs.length"
+        class="btn btn-ghost btn-sm section-action"
+        @click="clearLogs"
+      >
+        {{ t("trend.manage.clear") }}
+      </button>
+    </div>
     <div v-show="sectionsOpen.logs" class="collapse-body">
       <table class="data-table">
         <thead>
           <tr>
-            <th>时间</th>
-            <th>规则</th>
-            <th style="width: 110px">释放空间</th>
-            <th style="width: 90px">状态</th>
-            <th>备注</th>
+            <th>{{ t("trend.col.time") }}</th>
+            <th>{{ t("trend.col.rule") }}</th>
+            <th style="width: 110px">{{ t("trend.col.freed") }}</th>
+            <th style="width: 90px">{{ t("trend.col.status") }}</th>
+            <th>{{ t("trend.col.detail") }}</th>
+            <th style="width: 56px"></th>
           </tr>
         </thead>
         <tbody>
@@ -259,35 +369,56 @@ watch(trend, () => nextTick(renderCharts));
               <span :class="['status-tag', l.status]">{{ statusText[l.status] ?? l.status }}</span>
             </td>
             <td class="muted detail">{{ l.detail }}</td>
+            <td class="row-action">
+              <button class="icon-btn" :title="t('trend.manage.deleteRow')" @click="removeLog(l.id)">
+                <svg viewBox="0 0 20 20" width="14" height="14">
+                  <path d="M6 6l8 8M14 6l-8 8" stroke="currentColor" stroke-width="1.7"
+                    stroke-linecap="round" />
+                </svg>
+              </button>
+            </td>
           </tr>
         </tbody>
       </table>
       <button v-if="logs.length > logShown" class="show-more" @click="logShown += PAGE_SIZE">
-        显示更多（还有 {{ logs.length - logShown }} 条）
+        {{ t("common.showMoreRows", { n: logs.length - logShown }) }}
       </button>
-      <div v-if="logs.length === 0" class="muted hint">暂无清理记录</div>
+      <div v-if="logs.length === 0" class="muted hint">{{ t("trend.noLogs") }}</div>
     </div>
   </div>
 
   <!-- 实时事件（默认折叠） -->
   <div class="collapse-card" :class="{ open: sectionsOpen.events }">
-    <button class="collapse-head" @click="sectionsOpen.events = !sectionsOpen.events">
-      <svg class="collapse-chevron" viewBox="0 0 20 20" width="14" height="14">
-        <path d="M8 5l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8"
-          stroke-linecap="round" stroke-linejoin="round" />
-      </svg>
-      缓存目录实时事件
-      <span class="section-count">{{ events.length }}</span>
-      <span class="muted section-note">最近 100 条</span>
-    </button>
+    <div class="section-head">
+      <button class="collapse-head" @click="sectionsOpen.events = !sectionsOpen.events">
+        <svg class="collapse-chevron" viewBox="0 0 20 20" width="14" height="14">
+          <path d="M8 5l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8"
+            stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        {{ t("trend.eventsTitle") }}
+        <span class="section-count">{{ events.length }}</span>
+        <span class="live-badge">
+          <span class="live-dot"></span>{{ t("trend.manage.live") }}
+        </span>
+        <span class="muted section-note">{{ t("trend.eventsNote") }}</span>
+      </button>
+      <button
+        v-if="sectionsOpen.events && events.length"
+        class="btn btn-ghost btn-sm section-action"
+        @click="clearEvents"
+      >
+        {{ t("trend.manage.clear") }}
+      </button>
+    </div>
     <div v-show="sectionsOpen.events" class="collapse-body">
       <table class="data-table">
         <thead>
           <tr>
-            <th>时间</th>
-            <th style="width: 70px">类型</th>
-            <th>规则</th>
-            <th>路径</th>
+            <th>{{ t("trend.col.time") }}</th>
+            <th style="width: 70px">{{ t("trend.col.kind") }}</th>
+            <th>{{ t("trend.col.rule") }}</th>
+            <th>{{ t("trend.col.path") }}</th>
+            <th style="width: 56px"></th>
           </tr>
         </thead>
         <tbody>
@@ -298,14 +429,22 @@ watch(trend, () => nextTick(renderCharts));
             </td>
             <td class="nowrap">{{ e.rule_id }}</td>
             <td class="path" :title="e.path">{{ e.path }}</td>
+            <td class="row-action">
+              <button class="icon-btn" :title="t('trend.manage.deleteRow')" @click="removeEvent(e.id)">
+                <svg viewBox="0 0 20 20" width="14" height="14">
+                  <path d="M6 6l8 8M14 6l-8 8" stroke="currentColor" stroke-width="1.7"
+                    stroke-linecap="round" />
+                </svg>
+              </button>
+            </td>
           </tr>
         </tbody>
       </table>
       <button v-if="events.length > eventShown" class="show-more" @click="eventShown += PAGE_SIZE">
-        显示更多（还有 {{ events.length - eventShown }} 条）
+        {{ t("common.showMoreRows", { n: events.length - eventShown }) }}
       </button>
       <div v-if="events.length === 0" class="muted hint">
-        暂无事件（仅监听缓存目录内的新建/写入/删除，2 秒聚合）
+        {{ t("trend.noEvents") }}
       </div>
     </div>
   </div>
@@ -346,6 +485,67 @@ watch(trend, () => nextTick(renderCharts));
   margin-left: auto;
   font-size: 12px;
   font-weight: 400;
+}
+.section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-head .collapse-head {
+  flex: 1;
+}
+.section-action {
+  flex-shrink: 0;
+  margin-right: 6px;
+}
+.row-action {
+  text-align: right;
+  width: 56px;
+}
+.icon-btn {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 7px;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.icon-btn:hover {
+  background: var(--red-soft);
+  color: var(--red-text);
+}
+.live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--green-text);
+  background: var(--green-soft);
+  border-radius: 20px;
+  padding: 1px 9px;
+  margin-left: 4px;
+}
+.live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: live-pulse 1.6s ease-in-out infinite;
+}
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
 }
 .collapse-card.open .collapse-chevron {
   transform: rotate(90deg);

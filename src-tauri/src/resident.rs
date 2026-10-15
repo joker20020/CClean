@@ -115,11 +115,10 @@ fn check_low_space(
     let _ = storage.set_setting(SETTING_LAST_ALERT, &now.to_string());
 
     let free_gb = free as f64 / (1024.0 * 1024.0 * 1024.0);
-    let title = "系统盘剩余空间不足";
-    let body = format!(
-        "{disk_name} 仅剩 {free_gb:.1} GB（{pct}%），建议打开 CClean 清理缓存；\
-         可在仪表盘提示条中选择 12 小时内不再提醒"
-    );
+    let lang = crate::i18n::from_storage(storage);
+    let strings = crate::i18n::Strings::get(lang);
+    let title = strings.low_title;
+    let body = lang.low_space_body(disk_name, free_gb, pct);
     show_notification(app, title, &body);
 }
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { currentMonitor, getCurrentWindow } from "@tauri-apps/api/window";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
@@ -14,6 +15,7 @@ import {
 } from "./api";
 import { formatBytes } from "./utils/format";
 
+const { t } = useI18n();
 const win = getCurrentWindow();
 const overview = ref<Overview | null>(null);
 
@@ -108,7 +110,7 @@ async function doQuickClean() {
       .filter((r) => r.available && r.defaultSelected && r.action !== "report")
       .map((r) => r.id);
     if (ids.length === 0) {
-      resultText.value = "暂无可清理项";
+      resultText.value = t("float.noItems");
       phase.value = "result";
       backToIdle(3000);
       return;
@@ -116,19 +118,19 @@ async function doQuickClean() {
     const scanned = await scan(ids);
     const found = scanned.reduce((s, r) => s + r.sizeBytes, 0);
     if (found <= 0) {
-      resultText.value = "已很干净";
+      resultText.value = t("float.alreadyClean");
       phase.value = "result";
       backToIdle(3000);
       return;
     }
     const outcomes = await clean(ids.map((id) => ({ ruleId: id })));
     const freed = outcomes.reduce((s, o) => s + o.freedBytes, 0);
-    resultText.value = freed > 0 ? `已释放 ${formatBytes(freed)}` : "清理完成";
+    resultText.value = freed > 0 ? t("float.freed", { bytes: formatBytes(freed) }) : t("float.done");
     phase.value = "result";
     await refresh();
     backToIdle(3500);
   } catch (e) {
-    resultText.value = "清理失败，请在主窗口查看";
+    resultText.value = t("float.failed");
     phase.value = "result";
     backToIdle(3500);
   }
@@ -166,7 +168,7 @@ onUnmounted(() => {
       <template v-if="phase === 'idle' && overview">
         <div class="free" data-tauri-drag-region>
           {{ formatBytes(systemDisk(overview)?.availableBytes ?? 0) }}
-          <span class="free-label">可用</span>
+          <span class="free-label">{{ t("float.free") }}</span>
         </div>
         <div class="bar" data-tauri-drag-region>
           <div
@@ -182,9 +184,9 @@ onUnmounted(() => {
           ></div>
         </div>
       </template>
-      <div v-else-if="phase === 'confirm'" class="msg msg-warn">清理推荐缓存？</div>
+      <div v-else-if="phase === 'confirm'" class="msg msg-warn">{{ t("float.confirmClean") }}</div>
       <div v-else-if="phase === 'running'" class="msg">
-        <span class="spin"></span>清理中…
+        <span class="spin"></span>{{ t("float.cleaning") }}
       </div>
       <div v-else-if="phase === 'result'" class="msg msg-ok">{{ resultText }}</div>
       <div v-else class="free">—</div>
@@ -192,21 +194,21 @@ onUnmounted(() => {
 
     <div class="actions">
       <template v-if="phase === 'confirm'">
-        <button class="ab ab-ok" title="确认清理" @click="doQuickClean">
+        <button class="ab ab-ok" :title="t('float.titleConfirm')" @click="doQuickClean">
           <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,8.5 6.5,12 13,4.5" /></svg>
         </button>
-        <button class="ab" title="取消" @click="cancelQuickClean">
+        <button class="ab" :title="t('float.titleCancel')" @click="cancelQuickClean">
           <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="4" x2="12" y2="12" /><line x1="12" y1="4" x2="4" y2="12" /></svg>
         </button>
       </template>
       <template v-else>
-        <button class="ab" title="一键清理推荐缓存" :disabled="phase !== 'idle'" @click="askQuickClean">
+        <button class="ab" :title="t('float.titleQuickClean')" :disabled="phase !== 'idle'" @click="askQuickClean">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 4l-7 7" /><path d="M14 4h5v5" /><path d="M12 11l-3.5 6.5a2.5 2.5 0 0 1-3.4 1l-.6-.3a1 1 0 0 1-.4-1.4L8.5 9" /><path d="M5 15.5l4-2.8 2.3 2.3-2.8 4" /></svg>
         </button>
-        <button class="ab" title="打开主窗口" @click="openMain">
+        <button class="ab" :title="t('float.titleOpen')" @click="openMain">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" /></svg>
         </button>
-        <button class="ab" title="隐藏浮窗（可在设置或托盘菜单中重新开启）" @click="hideFloat">
+        <button class="ab" :title="t('float.titleHide')" @click="hideFloat">
           <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="4" x2="12" y2="12" /><line x1="12" y1="4" x2="4" y2="12" /></svg>
         </button>
       </template>

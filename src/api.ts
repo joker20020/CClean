@@ -206,6 +206,7 @@ export interface Settings {
   floatEnabled: boolean;
   floatClickThrough: boolean;
   theme: "light" | "dark" | "system";
+  language: "zh-CN" | "en-US" | "system";
 }
 
 export function takeSnapshot(): Promise<Snapshot> {
@@ -222,6 +223,22 @@ export function getCleanLogs(limit = 100): Promise<CleanLog[]> {
 
 export function getFsEvents(limit = 100): Promise<FsEvent[]> {
   return invoke<FsEvent[]>("get_fs_events", { limit });
+}
+
+export function deleteCleanLog(id: number): Promise<number> {
+  return invoke<number>("delete_clean_log", { id });
+}
+
+export function clearCleanLogs(): Promise<number> {
+  return invoke<number>("clear_clean_logs");
+}
+
+export function deleteFsEvent(id: number): Promise<number> {
+  return invoke<number>("delete_fs_event", { id });
+}
+
+export function clearFsEvents(): Promise<number> {
+  return invoke<number>("clear_fs_events");
 }
 
 export function getSettings(): Promise<Settings> {

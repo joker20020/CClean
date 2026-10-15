@@ -295,6 +295,26 @@ impl Storage {
         Ok(rows)
     }
 
+    pub fn delete_clean_log(&self, id: i64) -> Result<usize> {
+        let conn = self.conn.lock().map_err(|e| StorageError::Msg(e.to_string()))?;
+        Ok(conn.execute("DELETE FROM clean_logs WHERE id = ?1", rusqlite::params![id])?)
+    }
+
+    pub fn clear_clean_logs(&self) -> Result<usize> {
+        let conn = self.conn.lock().map_err(|e| StorageError::Msg(e.to_string()))?;
+        Ok(conn.execute("DELETE FROM clean_logs", [])?)
+    }
+
+    pub fn delete_fs_event(&self, id: i64) -> Result<usize> {
+        let conn = self.conn.lock().map_err(|e| StorageError::Msg(e.to_string()))?;
+        Ok(conn.execute("DELETE FROM fs_events WHERE id = ?1", rusqlite::params![id])?)
+    }
+
+    pub fn clear_fs_events(&self) -> Result<usize> {
+        let conn = self.conn.lock().map_err(|e| StorageError::Msg(e.to_string()))?;
+        Ok(conn.execute("DELETE FROM fs_events", [])?)
+    }
+
     pub fn get_setting(&self, key: &str) -> Result<Option<String>> {
         let conn = self.conn.lock().map_err(|e| StorageError::Msg(e.to_string()))?;
         let mut stmt = conn.prepare("SELECT value FROM settings WHERE key = ?1")?;

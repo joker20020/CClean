@@ -4,6 +4,7 @@ pub mod appdir;
 pub mod cleaner;
 pub mod commands;
 pub mod floatwin;
+pub mod i18n;
 pub mod platform;
 pub mod privilege;
 pub mod resident;
@@ -43,6 +44,124 @@ fn show_main_window(app: &tauri::AppHandle) {
         let _ = win.unminimize();
         let _ = win.set_focus();
     }
+}
+
+/// 构建（或按当前语言重建）系统托盘图标与菜单。
+pub fn build_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
+    let state = app.state::<AppState>();
+    let lang = i18n::from_storage(&state.storage);
+    let strings = i18n::Strings::get(lang);
+
+    // 语言切换后重建：先移除旧图标，避免出现多个托盘图标
+    let _ = app.remove_tray_by_id("main-tray");
+
+    let item_snapshot = MenuItem::with_id(app, "snapshot", strings.tray_snapshot, true, None::<&str>)?;
+    let item_show = MenuItem::with_id(app, "show", strings.tray_show, true, None::<&str>)?;
+    let float_on = state
+        .storage
+        .get_setting(floatwin::SETTING_FLOAT_ENABLED)
+        .ok()
+        .flatten()
+        .as_deref()
+        == Some("true");
+    let through_on = state
+        .storage
+        .get_setting(floatwin::SETTING_FLOAT_THROUGH)
+        .ok()
+        .flatten()
+        .as_deref()
+        == Some("true");
+    let item_float = CheckMenuItem::with_id(app, "float", strings.tray_float, true, float_on, None::<&str>)?;
+    let item_through = CheckMenuItem::with_id(
+        app,
+        "float-through",
+        strings.tray_through,
+        true,
+        through_on,
+        None::<&str>,
+    )?;
+    let sep = PredefinedMenuItem::separator(app)?;
+    let item_quit = MenuItem::with_id(app, "quit", strings.tray_quit, true, None::<&str>)?;
+    let menu = Menu::with_items(
+        app,
+        &[
+            &item_snapshot,
+            &item_show,
+            &sep,
+            &item_float,
+            &item_through,
+            &item_quit,
+        ],
+    )?;
+    TrayIconBuilder::with_id("main-tray")
+        .icon(app.default_window_icon().unwrap().clone())
+        .menu(&menu)
+        .tooltip(strings.tray_tooltip)
+        .on_menu_event({
+            let app_h = app.clone();
+            let item_float_h = item_float.clone();
+            let item_through_h = item_through.clone();
+            move |app, event| match event.id.as_ref() {
+                "snapshot" => {
+                    let state = app.state::<AppState>();
+                    let storage = state.storage.clone();
+                    let rules = state.rules.read().unwrap().clone();
+                    let app_h2 = app_h.clone();
+                    std::thread::spawn(move || match snapshot::take(&storage, &rules) {
+                        Ok(snap) => {
+                            let _ = storage.set_setting(
+                                resident::SETTING_LAST_SNAPSHOT,
+                                &snap.created_at.to_string(),
+                            );
+                            let _ = app_h2.emit("snapshot-taken", snap);
+                            let lang = i18n::from_storage(&storage);
+                            let s = i18n::Strings::get(lang);
+                            use tauri_plugin_notification::NotificationExt;
+                            let _ = app_h2
+                                .notification()
+                                .builder()
+                                .title(s.snap_title)
+                                .body(s.snap_body)
+                                .show();
+                        }
+                        Err(e) => eprintln!("[tray] 快照失败: {e}"),
+                    });
+                }
+                "float" => {
+                    let next = !item_float_h.is_checked().unwrap_or(false);
+                    match floatwin::set_enabled(app, next) {
+                        Ok(v) => {
+                            let _ = item_float_h.set_checked(v);
+                        }
+                        Err(e) => eprintln!("[float] 开关失败: {e}"),
+                    }
+                }
+                "float-through" => {
+                    let next = !item_through_h.is_checked().unwrap_or(false);
+                    match floatwin::set_click_through(app, next) {
+                        Ok(v) => {
+                            let _ = item_through_h.set_checked(v);
+                        }
+                        Err(e) => eprintln!("[float] 穿透切换失败: {e}"),
+                    }
+                }
+                "show" => show_main_window(app),
+                "quit" => {
+                    if let Some(float) = app.get_webview_window("float") {
+                        let _ = float.destroy();
+                    }
+                    app.exit(0);
+                }
+                _ => {}
+            }
+        })
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::DoubleClick { .. } = event {
+                show_main_window(tray.app_handle());
+            }
+        })
+        .build(app)?;
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -103,109 +222,8 @@ pub fn run() {
             // 恢复浮窗位置/穿透/可见性
             floatwin::apply_state(app.handle());
 
-            // 系统托盘
-            let item_snapshot = MenuItem::with_id(app, "snapshot", "立即记录快照", true, None::<&str>)?;
-            let item_show = MenuItem::with_id(app, "show", "打开主窗口", true, None::<&str>)?;
-            let float_on = storage
-                .get_setting(floatwin::SETTING_FLOAT_ENABLED)
-                .ok()
-                .flatten()
-                .as_deref()
-                == Some("true");
-            let through_on = storage
-                .get_setting(floatwin::SETTING_FLOAT_THROUGH)
-                .ok()
-                .flatten()
-                .as_deref()
-                == Some("true");
-            let item_float = CheckMenuItem::with_id(app, "float", "桌面浮窗", true, float_on, None::<&str>)?;
-            let item_through = CheckMenuItem::with_id(
-                app,
-                "float-through",
-                "浮窗鼠标穿透",
-                true,
-                through_on,
-                None::<&str>,
-            )?;
-            let sep = PredefinedMenuItem::separator(app)?;
-            let item_quit = MenuItem::with_id(app, "quit", "退出 CClean", true, None::<&str>)?;
-            let menu = Menu::with_items(
-                app,
-                &[
-                    &item_snapshot,
-                    &item_show,
-                    &sep,
-                    &item_float,
-                    &item_through,
-                    &item_quit,
-                ],
-            )?;
-            TrayIconBuilder::new()
-                .icon(app.default_window_icon().unwrap().clone())
-                .menu(&menu)
-                .tooltip("CClean 磁盘清理")
-                .on_menu_event({
-                    let app_h = app.handle().clone();
-                    let item_float_h = item_float.clone();
-                    let item_through_h = item_through.clone();
-                    move |app, event| match event.id.as_ref() {
-                        "snapshot" => {
-                            let state = app.state::<AppState>();
-                            let storage = state.storage.clone();
-                            let rules = state.rules.read().unwrap().clone();
-                            let app_h2 = app_h.clone();
-                            std::thread::spawn(move || match snapshot::take(&storage, &rules) {
-                                Ok(snap) => {
-                                    let _ = storage.set_setting(
-                                        resident::SETTING_LAST_SNAPSHOT,
-                                        &snap.created_at.to_string(),
-                                    );
-                                    let _ = app_h2.emit("snapshot-taken", snap);
-                                    use tauri_plugin_notification::NotificationExt;
-                                    let _ = app_h2
-                                        .notification()
-                                        .builder()
-                                        .title("CClean 快照已记录")
-                                        .body("可在趋势页查看占用变化")
-                                        .show();
-                                }
-                                Err(e) => eprintln!("[tray] 快照失败: {e}"),
-                            });
-                        }
-                        "float" => {
-                            let next = !item_float_h.is_checked().unwrap_or(false);
-                            match floatwin::set_enabled(app, next) {
-                                Ok(v) => {
-                                    let _ = item_float_h.set_checked(v);
-                                }
-                                Err(e) => eprintln!("[float] 开关失败: {e}"),
-                            }
-                        }
-                        "float-through" => {
-                            let next = !item_through_h.is_checked().unwrap_or(false);
-                            match floatwin::set_click_through(app, next) {
-                                Ok(v) => {
-                                    let _ = item_through_h.set_checked(v);
-                                }
-                                Err(e) => eprintln!("[float] 穿透切换失败: {e}"),
-                            }
-                        }
-                        "show" => show_main_window(app),
-                        "quit" => {
-                            if let Some(float) = app.get_webview_window("float") {
-                                let _ = float.destroy();
-                            }
-                            app.exit(0);
-                        }
-                        _ => {}
-                    }
-                })
-                .on_tray_icon_event(|tray, event| {
-                    if let TrayIconEvent::DoubleClick { .. } = event {
-                        show_main_window(tray.app_handle());
-                    }
-                })
-                .build(app)?;
+            // 系统托盘（按当前语言构建，语言切换时由 set_settings 重建）
+            build_tray(app.handle())?;
 
             // 关闭窗口时：常驻模式隐藏到托盘，否则彻底退出
             // （浮窗也是一个窗口，若仅销毁主窗口，进程会因浮窗存活而驻留，
@@ -273,6 +291,10 @@ pub fn run() {
             commands::get_trend,
             commands::get_clean_logs,
             commands::get_fs_events,
+            commands::delete_clean_log,
+            commands::clear_clean_logs,
+            commands::delete_fs_event,
+            commands::clear_fs_events,
             commands::get_settings,
             commands::set_settings,
             commands::snooze_low_space,
