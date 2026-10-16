@@ -5,7 +5,7 @@
 跨平台（Windows / macOS）磁盘缓存清理与占用监控工具，基于 **Tauri 2 + Rust + Vue 3 + ECharts**。
 
 > 状态：**M1–M4 已完成** —— 规则引擎、缓存清理、AI 报告、大文件分析、快照趋势、常驻守护、桌面浮窗、自定义规则、NSIS 安装包与自动更新通道均已就绪。
-> 完整设计见 [doc/DESIGN.zh-CN.md](./doc/DESIGN.zh-CN.md)，规则编写见 [RULES_CONTRIBUTING.zh-CN.md](./RULES_CONTRIBUTING.zh-CN.md)，打包发布见 [doc/RELEASE.zh-CN.md](./doc/RELEASE.zh-CN.md)。
+> 规则编写见 [RULES_CONTRIBUTING.zh-CN.md](./RULES_CONTRIBUTING.zh-CN.md)。
 
 ## 功能
 
@@ -21,15 +21,13 @@
 - **缓存目录监听**：仅监听规则登记的缓存目录（最多 80 个、2 秒去抖），新建/写入/删除事件入库并实时推送到趋势页，不做全盘挂钩
 - **桌面浮窗（可选）**：透明置顶迷你胶囊实时显示系统盘剩余空间，可拖动、靠近屏幕左右边缘自动吸附、可切换鼠标穿透，位置与状态持久化；浮窗内置一键清理（二次确认）、打开主窗口、隐藏三个快捷操作
 - **自定义规则**：应用内「规则」页直接编写 YAML（内置规则只读浏览），保存前强制白名单安全校验，存放于应用数据目录 `rules/`，扫描/清理即时生效
-- **安装包与自动更新**：Windows NSIS 当前用户安装包；内置 Updater，设置页一键检查更新（发布流程见 doc/RELEASE.md）
+- **安装包与自动更新**：Windows NSIS 当前用户安装包；内置 Updater，设置页一键检查更新
 - **占用跳过**：被占用、无权限文件自动跳过，不强杀进程
 - **磁盘总览**：系统盘仪表与各分区占用条
 
 ## 文档
 
-- [doc/DESIGN.zh-CN.md](./doc/DESIGN.zh-CN.md)：完整设计与安全模型
 - [RULES_CONTRIBUTING.zh-CN.md](./RULES_CONTRIBUTING.zh-CN.md)：清理规则 YAML 写法、白名单与贡献流程
-- [doc/RELEASE.zh-CN.md](./doc/RELEASE.zh-CN.md)：打包、代码签名与自动更新发布步骤
 
 ## 开发运行
 

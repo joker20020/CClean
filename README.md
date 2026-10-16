@@ -6,7 +6,7 @@ A cross-platform (Windows / macOS) disk cache cleaner and usage monitor built wi
 
 > Status: **M1–M4 complete** — rule engine, cache cleaning, AI model reports, large-file analysis, snapshot trends, tray daemon, desktop float widget, custom rules, NSIS installer and the auto-update channel are all in place.
 >
-> Full design: [doc/DESIGN.md](./doc/DESIGN.md) · Rule authoring: [RULES_CONTRIBUTING.md](./RULES_CONTRIBUTING.md) · Release & updates: [doc/RELEASE.md](./doc/RELEASE.md)
+> Rule authoring: [RULES_CONTRIBUTING.md](./RULES_CONTRIBUTING.md)
 
 ## Highlights
 
@@ -22,15 +22,13 @@ A cross-platform (Windows / macOS) disk cache cleaner and usage monitor built wi
 - **Cache directory watcher**: watches only the directories registered by rules (up to 80, 2-second debounce). Create/write/delete events are stored and streamed live to the Trends page — no full-disk hooks.
 - **Desktop float widget (optional)**: a transparent always-on-top capsule showing live free space; draggable, snaps to screen edges, supports click-through, and persists position/state. Built-in actions: one-click clean (with confirmation), open main window, hide.
 - **Custom rules**: write YAML directly in the Rules page (built-in rules are read-only). Mandatory allow-list validation runs before saving; files live in the app data directory `rules/` and take effect immediately.
-- **Installer & auto-update**: per-user Windows NSIS installer with a built-in updater; check for updates with one click in Settings (release process in [doc/RELEASE.md](./doc/RELEASE.md)).
+- **Installer & auto-update**: per-user Windows NSIS installer with a built-in updater; check for updates with one click in Settings.
 - **Graceful skipping**: locked or permission-denied files are skipped automatically — processes are never force-killed.
 - **Disk overview**: system-drive gauge plus per-partition usage bars.
 
 ## Documentation
 
-- [doc/DESIGN.md](./doc/DESIGN.md) — full architecture and security model
 - [RULES_CONTRIBUTING.md](./RULES_CONTRIBUTING.md) — cleanup-rule YAML format, allow-list and contribution workflow
-- [doc/RELEASE.md](./doc/RELEASE.md) — packaging, signing and the GitHub Releases auto-update flow
 
 ## Developing
 
