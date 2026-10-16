@@ -11,7 +11,6 @@ import BigFilesPage from "./pages/BigFilesPage.vue";
 import TrendPage from "./pages/TrendPage.vue";
 import RulesPage from "./pages/RulesPage.vue";
 import SettingsPage from "./pages/SettingsPage.vue";
-import { getSettings, setSettings } from "./api";
 import { changeTheme, getThemeMode, type ThemeMode } from "./utils/theme";
 import ConfirmModal from "./components/ConfirmModal.vue";
 import { confirmDialog } from "./components/confirm";
@@ -60,15 +59,8 @@ onMounted(async () => {
     }
   });
 
-  // 浮窗被关闭时同步设置页开关
-  await listen("float-closed", async () => {
-    try {
-      const s = await getSettings();
-      if (s.floatEnabled) await setSettings({ float_enabled: "false" });
-    } catch {
-      // 忽略设置同步失败
-    }
-  });
+  // 浮窗开关/穿透状态由后端 "float-state-changed" 事件广播，
+  // 设置页直接监听该事件同步控件，无需在此中转。
 
   themeMode.value = getThemeMode();
   try {

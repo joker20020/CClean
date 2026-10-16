@@ -9,6 +9,7 @@ import {
   getRules,
   getSystemOverview,
   scan,
+  setFloatEnabled,
   setSettings,
   showMainWindow,
   type Overview,
@@ -145,8 +146,13 @@ async function openMain() {
 }
 
 async function hideFloat() {
-  await win.hide();
-  await setSettings({ float_enabled: "false" });
+  // 走统一的浮窗开关命令：后端负责隐藏窗口、持久化、同步托盘并广播状态
+  try {
+    await setFloatEnabled(false);
+  } catch {
+    // 兜底：命令失败时至少隐藏本窗口
+    await win.hide();
+  }
 }
 
 onMounted(async () => {

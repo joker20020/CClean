@@ -14,18 +14,25 @@ pub mod snapshot;
 pub mod storage;
 pub mod watcher;
 
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 
-use tauri::{Emitter, Manager, WindowEvent};
+use tauri::{Emitter, Manager, Wry, WindowEvent};
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
 
 use rules::Rule;
 use storage::Storage;
 
+/// 托盘菜单中浮窗相关勾选项的句柄，供设置页/浮窗等其他入口修改后同步勾选状态。
+pub struct TrayItemHandles {
+    pub float: CheckMenuItem<Wry>,
+    pub through: CheckMenuItem<Wry>,
+}
+
 pub struct AppState {
     pub rules: Arc<RwLock<Vec<Rule>>>,
     pub storage: Arc<Storage>,
+    pub tray_items: Mutex<Option<TrayItemHandles>>,
 }
 
 impl AppState {
@@ -93,6 +100,12 @@ pub fn build_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
             &item_quit,
         ],
     )?;
+    // 保存勾选项句柄，供浮窗状态在其他入口（设置页/浮窗按钮）变更时同步托盘
+    *state.tray_items.lock().unwrap() = Some(TrayItemHandles {
+        float: item_float.clone(),
+        through: item_through.clone(),
+    });
+
     TrayIconBuilder::with_id("main-tray")
         .icon(app.default_window_icon().unwrap().clone())
         .menu(&menu)
@@ -195,6 +208,7 @@ pub fn run() {
         .manage(AppState {
             rules: rules.clone(),
             storage: storage.clone(),
+            tray_items: Mutex::new(None),
         })
         .setup(move |app| {
             // 首次启动自动记录一条基线快照（后台线程，不阻塞 UI）

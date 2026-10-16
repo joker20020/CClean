@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { onMounted, onUnmounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { check } from "@tauri-apps/plugin-updater";
 import { getVersion } from "@tauri-apps/api/app";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import {
   getPrivilegeStatus,
   getSettings,
@@ -131,7 +132,24 @@ async function save(updates: Record<string, string>) {
   }
 }
 
-onMounted(load);
+let unlistenFloat: UnlistenFn | null = null;
+
+onMounted(async () => {
+  await load();
+  // 浮窗/托盘/其他窗口修改浮窗开关或穿透时，同步本页控件状态
+  unlistenFloat = await listen<{ enabled: boolean; clickThrough: boolean }>(
+    "float-state-changed",
+    (e) => {
+      if (!settings.value) return;
+      settings.value.floatEnabled = e.payload.enabled;
+      settings.value.floatClickThrough = e.payload.clickThrough;
+    }
+  );
+});
+
+onUnmounted(() => {
+  unlistenFloat?.();
+});
 </script>
 
 <template>

@@ -657,6 +657,18 @@ pub fn set_settings(
         }
     }
 
+    // 浮窗开关/穿透若被直接写入设置，需同步窗口状态、托盘勾选并广播给前端
+    if let Some(v) = updates.get(crate::floatwin::SETTING_FLOAT_ENABLED) {
+        if let Err(e) = crate::floatwin::set_enabled(&app, v == "true") {
+            eprintln!("[float] 同步启用状态失败: {e}");
+        }
+    }
+    if let Some(v) = updates.get(crate::floatwin::SETTING_FLOAT_THROUGH) {
+        if let Err(e) = crate::floatwin::set_click_through(&app, v == "true") {
+            eprintln!("[float] 同步穿透状态失败: {e}");
+        }
+    }
+
     // 常驻 / 自启联动：两者都开启时才注册开机自启
     let resident_on =
         storage.get_setting(resident::SETTING_RESIDENT).ok().flatten().as_deref() == Some("true");
