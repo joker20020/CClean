@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { listen } from "@tauri-apps/api/event";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import Dashboard from "./pages/Dashboard.vue";
@@ -22,6 +23,33 @@ type PageKey = "dashboard" | "clean" | "ai" | "bigfiles" | "trend" | "rules" | "
 const page = ref<PageKey>("dashboard");
 const themeMode = ref<ThemeMode>("system");
 const appVersion = ref("");
+
+// ---------- 自定义标题栏 ----------
+const appWin = getCurrentWindow();
+const isMaximized = ref(false);
+const isMac = ref(false);
+let unlistenResized: UnlistenFn | null = null;
+
+const currentPageLabel = computed(() => t(navItems.find((i) => i.key === page.value)!.labelKey));
+
+async function syncMaximized() {
+  try {
+    isMaximized.value = await appWin.isMaximized();
+  } catch {
+    // 非 Tauri 环境
+  }
+}
+
+function winMinimize() {
+  appWin.minimize().catch(() => {});
+}
+function winToggleMaximize() {
+  appWin.toggleMaximize().catch(() => {});
+}
+// 关闭仍走后端 CloseRequested 逻辑：常驻模式最小化到托盘，否则退出
+function winClose() {
+  appWin.close().catch(() => {});
+}
 
 const navItems: { key: PageKey; labelKey: string; icon: string }[] = [
   { key: "dashboard", labelKey: "app.nav.dashboard", icon: "dashboard" },
@@ -68,12 +96,63 @@ onMounted(async () => {
   } catch {
     // 非 Tauri 环境下忽略
   }
+
+  isMac.value = /mac|darwin/i.test(navigator.platform || navigator.userAgent);
+  await syncMaximized();
+  unlistenResized = await listen("tauri://resize", syncMaximized);
+});
+
+onUnmounted(() => {
+  unlistenResized?.();
 });
 </script>
 
 <template>
   <div class="app-shell">
-    <aside class="sidebar">
+    <!-- 自定义标题栏（原生标题栏已通过 decorations:false 隐藏） -->
+    <header class="titlebar" data-tauri-drag-region :class="{ mac: isMac }">
+      <div class="tb-left" data-tauri-drag-region>
+        <span class="tb-logo" aria-hidden="true">
+          <svg viewBox="0 0 32 32" width="15" height="15">
+            <circle cx="16" cy="16" r="11" fill="none" stroke="currentColor" stroke-width="3.4"
+              stroke-linecap="round" stroke-dasharray="52 69" transform="rotate(-90 16 16)" />
+            <circle cx="23.5" cy="22" r="3.4" fill="#34d399" />
+          </svg>
+        </span>
+        <span class="tb-app">CClean</span>
+        <span class="tb-sep" aria-hidden="true">/</span>
+        <span class="tb-page">{{ currentPageLabel }}</span>
+      </div>
+      <div class="tb-controls" v-if="!isMac" data-tauri-drag-region="false">
+        <button class="tb-btn" :title="t('app.titlebar.minimize')" aria-label="minimize"
+          @click="winMinimize">
+          <svg viewBox="0 0 12 12" width="11" height="11">
+            <rect x="2" y="5.6" width="8" height="1" fill="currentColor" />
+          </svg>
+        </button>
+        <button class="tb-btn" :title="isMaximized ? t('app.titlebar.restore') : t('app.titlebar.maximize')"
+          :aria-label="isMaximized ? 'restore' : 'maximize'" @click="winToggleMaximize">
+          <svg v-if="!isMaximized" viewBox="0 0 12 12" width="10.5" height="10.5">
+            <rect x="2.2" y="2.2" width="7.6" height="7.6" fill="none" stroke="currentColor"
+              stroke-width="1" />
+          </svg>
+          <svg v-else viewBox="0 0 12 12" width="10.5" height="10.5">
+            <rect x="3.4" y="1.6" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1" />
+            <path d="M1.6 4v6.4h6.4" fill="none" stroke="currentColor" stroke-width="1"
+              stroke-linejoin="round" />
+          </svg>
+        </button>
+        <button class="tb-btn tb-close" :title="t('app.titlebar.close')" aria-label="close"
+          @click="winClose">
+          <svg viewBox="0 0 12 12" width="11" height="11">
+            <path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="app-body">
+      <aside class="sidebar">
       <div class="brand">
         <span class="brand-logo" aria-hidden="true">
           <svg viewBox="0 0 32 32" width="22" height="22">
@@ -191,6 +270,7 @@ onMounted(async () => {
         <SettingsPage v-else-if="page === 'settings'" />
       </div>
     </main>
+    </div>
 
     <!-- 全局模态确认框（替代浏览器原生 confirm） -->
     <ConfirmModal />
@@ -200,8 +280,89 @@ onMounted(async () => {
 <style scoped>
 .app-shell {
   display: flex;
+  flex-direction: column;
   height: 100%;
   overflow: hidden;
+}
+
+/* ---------- 自定义标题栏 ---------- */
+.titlebar {
+  height: 40px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0 0 14px;
+  background: var(--sidebar);
+  border-bottom: 1px solid var(--sidebar-border);
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background-color 0.25s ease, border-color 0.25s ease;
+  /* macOS 为原生红绿灯按钮预留左侧空间 */
+}
+.titlebar.mac {
+  padding-left: 84px;
+}
+.tb-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 100%;
+}
+.tb-logo {
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+}
+.tb-app {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text);
+}
+.tb-sep {
+  font-size: 12px;
+  color: var(--border-strong);
+}
+.tb-page {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tb-controls {
+  display: flex;
+  align-items: stretch;
+  height: 100%;
+  -webkit-app-region: no-drag;
+}
+.tb-btn {
+  width: 46px;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+.tb-btn:hover {
+  background: var(--panel-hover);
+  color: var(--text);
+}
+.tb-btn.tb-close:hover {
+  background: #e81123;
+  color: #fff;
+}
+
+/* ---------- 主体（侧边栏 + 内容） ---------- */
+.app-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
 }
 
 /* ---------- 侧边栏 ---------- */

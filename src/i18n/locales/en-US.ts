@@ -35,6 +35,12 @@ const enUS: MessageSchema = {
       dark: "Dark",
       system: "System",
     },
+    titlebar: {
+      minimize: "Minimize",
+      maximize: "Maximize",
+      restore: "Restore",
+      close: "Close",
+    },
     lowSpace: {
       title: "Low free space on the system drive",
       goClean: "Clean now",

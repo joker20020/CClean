@@ -23,6 +23,12 @@ const zhCN = {
       dark: "深色",
       system: "跟随系统",
     },
+    titlebar: {
+      minimize: "最小化",
+      maximize: "最大化",
+      restore: "向下还原",
+      close: "关闭",
+    },
     lowSpace: {
       title: "系统盘剩余空间不足",
       goClean: "去清理",
