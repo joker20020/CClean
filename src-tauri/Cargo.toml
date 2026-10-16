@@ -1,6 +1,6 @@
 [package]
 name = "cclean"
-version = "0.2.1"
+version = "1.0.0"
 description = "CClean - cross-platform disk cache cleaner and usage monitor"
 authors = ["CClean"]
 edition = "2021"
