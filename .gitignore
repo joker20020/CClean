@@ -29,6 +29,3 @@ src-tauri/gen
 *.njsproj
 *.sln
 *.sw?
-
-# Documents
-doc/

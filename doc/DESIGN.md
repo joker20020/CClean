@@ -224,7 +224,10 @@ Every write command re-validates the path allow-list on the backend; the fronten
 ```
 CClean/
 ├─ README.md / README.zh-CN.md
-├─ DESIGN.md / RULES_CONTRIBUTING.md / RELEASE.md (+ .zh-CN.md)
+├─ RULES_CONTRIBUTING.md (+ .zh-CN.md)
+├─ doc/                         # design & release docs
+│  ├─ DESIGN.md / DESIGN.zh-CN.md
+│  └─ RELEASE.md / RELEASE.zh-CN.md
 ├─ package.json / pnpm-lock.yaml / vite.config.ts / tsconfig.json
 ├─ index.html
 ├─ src/                       # Vue 3 frontend

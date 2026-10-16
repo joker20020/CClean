@@ -217,8 +217,11 @@
 
 ```
 CClean/
-├─ DESIGN.md
-├─ README.md
+├─ README.md / README.zh-CN.md
+├─ RULES_CONTRIBUTING.md（+ .zh-CN.md）
+├─ doc/                    # 设计与发布文档
+│  ├─ DESIGN.md / DESIGN.zh-CN.md
+│  └─ RELEASE.md / RELEASE.zh-CN.md
 ├─ package.json / pnpm-lock.yaml / vite.config.ts / tsconfig.json
 ├─ index.html
 ├─ src/                    # 前端 Vue3
