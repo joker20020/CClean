@@ -56,82 +56,112 @@ fn guidance(rule_id: &str) -> &'static str {
 }
 
 /// 尝试执行 `ollama list`，返回输出（未安装或失败返回空串）。
+/// 加超时保护：ollama 首次运行可能拉起后台服务，长时间无响应不应拖住扫描。
 fn ollama_list() -> String {
-    let result = std::process::Command::new("ollama")
+    let mut child = match std::process::Command::new("ollama")
         .arg("list")
-        .output();
-    match result {
-        Ok(out) if out.status.success() => {
-            let mut s = String::from_utf8_lossy(&out.stdout).trim().to_string();
-            let stderr = String::from_utf8_lossy(&out.stderr);
-            if s.is_empty() && !stderr.trim().is_empty() {
-                s = stderr.trim().to_string();
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+    {
+        Ok(c) => c,
+        Err(_) => return String::new(),
+    };
+
+    let timeout = std::time::Duration::from_secs(15);
+    let start = std::time::Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                let output = child.wait_with_output().unwrap_or_else(|_| {
+                    std::process::Output {
+                        status,
+                        stdout: Vec::new(),
+                        stderr: Vec::new(),
+                    }
+                });
+                if status.success() {
+                    let mut s = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    if s.is_empty() && !stderr.trim().is_empty() {
+                        s = stderr.trim().to_string();
+                    }
+                    return s;
+                }
+                return String::new();
             }
-            s
+            Ok(None) => {
+                if start.elapsed() > timeout {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return String::new();
+                }
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
+            Err(_) => return String::new(),
         }
-        _ => String::new(),
     }
 }
 
 pub fn build_report(rules: &[Rule]) -> Vec<ModelGroup> {
-    let ai_report_rules: Vec<&Rule> = rules
-        .iter()
-        .filter(|r| r.is_report() && r.category == "ai")
-        .collect();
+    crate::taskpool::run(|| {
+        let ai_report_rules: Vec<&Rule> = rules
+            .iter()
+            .filter(|r| r.is_report() && r.category == "ai")
+            .collect();
 
-    let ollama_output = ollama_list();
+        let ollama_output = ollama_list();
 
-    ai_report_rules
-        .par_iter()
-        .map(|rule| {
-            let targets = scanner::resolve_rule(rule);
-            let existing: Vec<PathBuf> =
-                targets.iter().map(|t| t.path.clone()).filter(|p| p.exists()).collect();
+        ai_report_rules
+            .par_iter()
+            .map(|rule| {
+                let targets = scanner::resolve_rule(rule);
+                let existing: Vec<PathBuf> =
+                    targets.iter().map(|t| t.path.clone()).filter(|p| p.exists()).collect();
 
-            let mut size_bytes = 0u64;
-            let mut file_count = 0u64;
-            let mut entries: Vec<ModelEntry> = Vec::new();
+                let mut size_bytes = 0u64;
+                let mut file_count = 0u64;
+                let mut entries: Vec<ModelEntry> = Vec::new();
 
-            for path in &existing {
-                // 目录：统计一级子项（模型仓库/模型文件夹粒度）
-                if path.is_dir() {
-                    for child in analyzer::child_sizes(path) {
-                        size_bytes = size_bytes.saturating_add(child.size_bytes);
-                        file_count = file_count.saturating_add(child.file_count);
-                        entries.push(ModelEntry {
-                            name: child.name,
-                            path: child.path,
-                            size_bytes: child.size_bytes,
-                            is_dir: child.is_dir,
-                        });
+                for path in &existing {
+                    // 目录：统计一级子项（模型仓库/模型文件夹粒度）
+                    if path.is_dir() {
+                        for child in analyzer::child_sizes(path) {
+                            size_bytes = size_bytes.saturating_add(child.size_bytes);
+                            file_count = file_count.saturating_add(child.file_count);
+                            entries.push(ModelEntry {
+                                name: child.name,
+                                path: child.path,
+                                size_bytes: child.size_bytes,
+                                is_dir: child.is_dir,
+                            });
+                        }
+                    } else if let Ok(meta) = std::fs::metadata(path) {
+                        size_bytes = size_bytes.saturating_add(meta.len());
+                        file_count += 1;
                     }
-                } else if let Ok(meta) = std::fs::metadata(path) {
-                    size_bytes = size_bytes.saturating_add(meta.len());
-                    file_count += 1;
                 }
-            }
-            entries.sort_by(|a, b| b.size_bytes.cmp(&a.size_bytes));
+                entries.sort_by(|a, b| b.size_bytes.cmp(&a.size_bytes));
 
-            let cli_output = if rule.id == "report.ollama_models" {
-                ollama_output.clone()
-            } else {
-                String::new()
-            };
+                let cli_output = if rule.id == "report.ollama_models" {
+                    ollama_output.clone()
+                } else {
+                    String::new()
+                };
 
-            ModelGroup {
-                rule_id: rule.id.clone(),
-                name: rule.name.clone(),
-                description: rule.description.clone(),
-                available: !existing.is_empty() && (size_bytes > 0 || !cli_output.is_empty()),
-                size_bytes,
-                file_count,
-                paths: existing.iter().map(|p| p.to_string_lossy().to_string()).collect(),
-                entries,
-                guidance: guidance(&rule.id).to_string(),
-                cli_output,
-            }
-        })
-        .collect::<Vec<_>>()
-        .into_iter()
-        .collect()
+                ModelGroup {
+                    rule_id: rule.id.clone(),
+                    name: rule.name.clone(),
+                    description: rule.description.clone(),
+                    available: !existing.is_empty() && (size_bytes > 0 || !cli_output.is_empty()),
+                    size_bytes,
+                    file_count,
+                    paths: existing.iter().map(|p| p.to_string_lossy().to_string()).collect(),
+                    entries,
+                    guidance: guidance(&rule.id).to_string(),
+                    cli_output,
+                }
+            })
+            .collect::<Vec<_>>()
+    })
 }

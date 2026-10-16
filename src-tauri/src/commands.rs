@@ -17,6 +17,7 @@ use crate::rules::{self, Rule};
 use crate::scanner::{self, RuleStat};
 use crate::snapshot;
 use crate::storage::{CleanLog, FsEvent, Snapshot, TrendData};
+use crate::taskpool;
 use crate::AppState;
 
 #[derive(serde::Serialize)]
@@ -88,14 +89,19 @@ fn scan_dto(stat: RuleStat) -> ScanResultDto {
 }
 
 #[tauri::command]
-pub fn get_system_overview() -> Overview {
-    platform::overview()
+pub async fn get_system_overview() -> Result<Overview, String> {
+    // 磁盘枚举可能因网络盘/移动盘而阻塞数秒，必须离开主线程，否则界面卡死
+    tauri::async_runtime::spawn_blocking(platform::overview)
+        .await
+        .map_err(|e| format!("读取磁盘信息失败: {e}"))
 }
 
 #[tauri::command]
-pub fn get_rules(state: State<'_, AppState>) -> Vec<RuleDto> {
-    let rules = state.rules.read().unwrap();
-    rules.iter().map(rule_dto).collect()
+pub async fn get_rules(state: State<'_, AppState>) -> Result<Vec<RuleDto>, String> {
+    let rules = state.rules.read().unwrap().clone();
+    tauri::async_runtime::spawn_blocking(move || rules.iter().map(rule_dto).collect())
+        .await
+        .map_err(|e| format!("读取规则失败: {e}"))
 }
 
 /// 扫描/清理进度事件载荷（按规则逐条推进）。
@@ -122,25 +128,28 @@ pub async fn scan(
             .cloned()
             .collect();
         let total = targets.len();
-        // 逐条并行扫描，但每条完成后发射进度事件，前端可显示确定性进度条
-        use rayon::prelude::*;
-        targets
-            .par_iter()
-            .enumerate()
-            .map(|(i, rule)| {
-                let dto = scan_dto(scanner::scan_rule(rule));
-                let _ = app.emit(
-                    "scan-progress",
-                    ProgressPayload {
-                        index: i + 1,
-                        total,
-                        id: rule.id.clone(),
-                        name: rule.name.clone(),
-                    },
-                );
-                dto
-            })
-            .collect::<Vec<_>>()
+        // 逐条并行扫描，但每条完成后发射进度事件，前端可显示确定性进度条。
+        // 统一在有界扫描线程池内执行，避免占满 CPU 拖卡界面。
+        taskpool::run(|| {
+            use rayon::prelude::*;
+            targets
+                .par_iter()
+                .enumerate()
+                .map(|(i, rule)| {
+                    let dto = scan_dto(scanner::scan_rule(rule));
+                    let _ = app.emit(
+                        "scan-progress",
+                        ProgressPayload {
+                            index: i + 1,
+                            total,
+                            id: rule.id.clone(),
+                            name: rule.name.clone(),
+                        },
+                    );
+                    dto
+                })
+                .collect::<Vec<_>>()
+        })
     })
     .await
     .map_err(|e| format!("扫描任务失败: {e}"))
@@ -329,16 +338,22 @@ pub async fn list_dir_sizes(path: String) -> Result<Vec<DirEntry>, String> {
 }
 
 #[tauri::command]
-pub fn default_roots() -> Vec<String> {
-    analyzer::default_big_file_roots()
-        .into_iter()
-        .map(|p| p.to_string_lossy().to_string())
-        .collect()
+pub async fn default_roots() -> Result<Vec<String>, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        analyzer::default_big_file_roots()
+            .into_iter()
+            .map(|p| p.to_string_lossy().to_string())
+            .collect()
+    })
+    .await
+    .map_err(|e| format!("读取默认目录失败: {e}"))
 }
 
 #[tauri::command]
-pub fn get_brew_status() -> BrewInfo {
-    platform::brew_status()
+pub async fn get_brew_status() -> Result<BrewInfo, String> {
+    tauri::async_runtime::spawn_blocking(platform::brew_status)
+        .await
+        .map_err(|e| format!("读取 Homebrew 状态失败: {e}"))
 }
 
 #[tauri::command]
@@ -351,8 +366,10 @@ pub async fn run_brew_cleanup() -> Result<String, String> {
 // ===== M4：用户自定义规则 =====
 
 #[tauri::command]
-pub fn list_custom_rules() -> Vec<rules::UserRuleFile> {
-    rules::list_user_files()
+pub async fn list_custom_rules() -> Result<Vec<rules::UserRuleFile>, String> {
+    tauri::async_runtime::spawn_blocking(rules::list_user_files)
+        .await
+        .map_err(|e| format!("读取用户规则失败: {e}"))
 }
 
 #[tauri::command]
@@ -470,26 +487,35 @@ pub async fn take_snapshot(state: State<'_, AppState>) -> Result<Snapshot, Strin
 }
 
 #[tauri::command]
-pub fn get_trend(state: State<'_, AppState>, limit: Option<u32>) -> Result<TrendData, String> {
-    state
-        .storage
-        .trend(limit.unwrap_or(90))
+pub async fn get_trend(state: State<'_, AppState>, limit: Option<u32>) -> Result<TrendData, String> {
+    let storage = state.storage.clone();
+    tauri::async_runtime::spawn_blocking(move || storage.trend(limit.unwrap_or(90)))
+        .await
+        .map_err(|e| format!("趋势查询失败: {e}"))?
         .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub fn get_clean_logs(state: State<'_, AppState>, limit: Option<u32>) -> Result<Vec<CleanLog>, String> {
-    state
-        .storage
-        .clean_logs(limit.unwrap_or(100))
+pub async fn get_clean_logs(
+    state: State<'_, AppState>,
+    limit: Option<u32>,
+) -> Result<Vec<CleanLog>, String> {
+    let storage = state.storage.clone();
+    tauri::async_runtime::spawn_blocking(move || storage.clean_logs(limit.unwrap_or(100)))
+        .await
+        .map_err(|e| format!("清理记录查询失败: {e}"))?
         .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub fn get_fs_events(state: State<'_, AppState>, limit: Option<u32>) -> Result<Vec<FsEvent>, String> {
-    state
-        .storage
-        .fs_events(limit.unwrap_or(100))
+pub async fn get_fs_events(
+    state: State<'_, AppState>,
+    limit: Option<u32>,
+) -> Result<Vec<FsEvent>, String> {
+    let storage = state.storage.clone();
+    tauri::async_runtime::spawn_blocking(move || storage.fs_events(limit.unwrap_or(100)))
+        .await
+        .map_err(|e| format!("事件查询失败: {e}"))?
         .map_err(|e| e.to_string())
 }
 

@@ -42,38 +42,40 @@ pub fn default_big_file_roots() -> Vec<PathBuf> {
 
 /// 在给定根目录下查找大于阈值的文件，按大小降序，最多 limit 条。
 pub fn big_files(roots: &[PathBuf], min_bytes: u64, limit: usize) -> Vec<BigFile> {
-    let mut found: Vec<BigFile> = roots
-        .par_iter()
-        .filter(|p| p.is_dir())
-        .flat_map_iter(|root| {
-            walkdir::WalkDir::new(root)
-                .follow_links(false)
-                .into_iter()
-                .flatten()
-                .filter(|e| e.file_type().is_file())
-                .filter_map(|e| {
-                    let meta = e.metadata().ok()?;
-                    let size = meta.len();
-                    if size < min_bytes {
-                        return None;
-                    }
-                    let modified_ts = meta
-                        .modified()
-                        .ok()
-                        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-                        .map(|d| d.as_secs() as i64);
-                    Some(BigFile {
-                        name: e.file_name().to_string_lossy().to_string(),
-                        path: e.path().to_string_lossy().to_string(),
-                        size_bytes: size,
-                        modified_ts,
+    crate::taskpool::run(|| {
+        let mut found: Vec<BigFile> = roots
+            .par_iter()
+            .filter(|p| p.is_dir())
+            .flat_map_iter(|root| {
+                walkdir::WalkDir::new(root)
+                    .follow_links(false)
+                    .into_iter()
+                    .flatten()
+                    .filter(|e| e.file_type().is_file())
+                    .filter_map(|e| {
+                        let meta = e.metadata().ok()?;
+                        let size = meta.len();
+                        if size < min_bytes {
+                            return None;
+                        }
+                        let modified_ts = meta
+                            .modified()
+                            .ok()
+                            .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                            .map(|d| d.as_secs() as i64);
+                        Some(BigFile {
+                            name: e.file_name().to_string_lossy().to_string(),
+                            path: e.path().to_string_lossy().to_string(),
+                            size_bytes: size,
+                            modified_ts,
+                        })
                     })
-                })
-        })
-        .collect();
-    found.sort_by(|a, b| b.size_bytes.cmp(&a.size_bytes));
-    found.truncate(limit);
-    found
+            })
+            .collect();
+        found.sort_by(|a, b| b.size_bytes.cmp(&a.size_bytes));
+        found.truncate(limit);
+        found
+    })
 }
 
 /// 统计某个目录一级子项各自的占用大小（目录会递归统计）。
@@ -86,27 +88,29 @@ pub fn child_sizes(root: &Path) -> Vec<DirEntry> {
         .map(|e| e.path())
         .collect();
 
-    children
-        .into_par_iter()
-        .map(|p| {
-            let is_dir = p.is_dir();
-            let (size_bytes, file_count) = if is_dir {
-                dir_size(&p)
-            } else {
-                (std::fs::metadata(&p).map(|m| m.len()).unwrap_or(0), 1)
-            };
-            DirEntry {
-                name: p
-                    .file_name()
-                    .map(|n| n.to_string_lossy().to_string())
-                    .unwrap_or_default(),
-                path: p.to_string_lossy().to_string(),
-                is_dir,
-                size_bytes,
-                file_count,
-            }
-        })
-        .collect()
+    crate::taskpool::run(|| {
+        children
+            .into_par_iter()
+            .map(|p| {
+                let is_dir = p.is_dir();
+                let (size_bytes, file_count) = if is_dir {
+                    dir_size(&p)
+                } else {
+                    (std::fs::metadata(&p).map(|m| m.len()).unwrap_or(0), 1)
+                };
+                DirEntry {
+                    name: p
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_default(),
+                    path: p.to_string_lossy().to_string(),
+                    is_dir,
+                    size_bytes,
+                    file_count,
+                }
+            })
+            .collect()
+    })
 }
 
 /// 递归统计目录总大小与文件数。

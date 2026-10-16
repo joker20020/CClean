@@ -12,6 +12,7 @@ pub mod rules;
 pub mod scanner;
 pub mod snapshot;
 pub mod storage;
+pub mod taskpool;
 pub mod watcher;
 
 use std::sync::{Arc, Mutex, RwLock};

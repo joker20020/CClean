@@ -59,28 +59,32 @@ fn target_applies(t: &Target) -> bool {
 }
 
 pub fn scan_rules(rules: &[Rule], ids: Option<&[String]>) -> Vec<RuleStat> {
-    rules
-        .par_iter()
-        .filter(|r| ids.map_or(true, |ids| ids.iter().any(|id| id == &r.id)))
-        .map(scan_rule)
-        .collect()
+    crate::taskpool::run(|| {
+        rules
+            .par_iter()
+            .filter(|r| ids.map_or(true, |ids| ids.iter().any(|id| id == &r.id)))
+            .map(scan_rule)
+            .collect()
+    })
 }
 
 pub fn scan_rule(rule: &Rule) -> RuleStat {
-    let targets = resolve_rule(rule)
-        .par_iter()
-        .map(scan_path)
-        .collect::<Vec<_>>();
-    let size_bytes = targets.iter().map(|t| t.size_bytes).sum();
-    let file_count = targets.iter().map(|t| t.file_count).sum();
-    let error_count = targets.iter().map(|t| t.error_count).sum();
-    RuleStat {
-        rule: rule.clone(),
-        targets,
-        size_bytes,
-        file_count,
-        error_count,
-    }
+    crate::taskpool::run(|| {
+        let targets = resolve_rule(rule)
+            .par_iter()
+            .map(scan_path)
+            .collect::<Vec<_>>();
+        let size_bytes = targets.iter().map(|t| t.size_bytes).sum();
+        let file_count = targets.iter().map(|t| t.file_count).sum();
+        let error_count = targets.iter().map(|t| t.error_count).sum();
+        RuleStat {
+            rule: rule.clone(),
+            targets,
+            size_bytes,
+            file_count,
+            error_count,
+        }
+    })
 }
 
 pub fn scan_path(rt: &ResolvedTarget) -> TargetStat {
