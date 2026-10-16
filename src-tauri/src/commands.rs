@@ -245,9 +245,10 @@ pub fn reveal_item(path: String) -> Result<(), String> {
     {
         // explorer.exe /select,"C:\path\file"；explorer 即使成功也常返回退出码 1，故不检查状态
         let arg = format!("/select,{path}");
-        std::process::Command::new("explorer.exe")
-            .arg(arg)
-            .spawn()
+        let mut cmd = std::process::Command::new("explorer.exe");
+        cmd.arg(arg);
+        crate::platform::no_window(&mut cmd);
+        cmd.spawn()
             .map(|_| ())
             .map_err(|e| format!("打开资源管理器失败: {e}"))
     }
@@ -273,9 +274,10 @@ pub fn reveal_item(path: String) -> Result<(), String> {
 fn open_path_folder(path: &str) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
-        std::process::Command::new("explorer.exe")
-            .arg(path)
-            .spawn()
+        let mut cmd = std::process::Command::new("explorer.exe");
+        cmd.arg(path);
+        crate::platform::no_window(&mut cmd);
+        cmd.spawn()
             .map(|_| ())
             .map_err(|e| format!("打开文件夹失败: {e}"))
     }

@@ -3,6 +3,16 @@
 use serde::Serialize;
 use sysinfo::{Disks, System};
 
+/// Windows 下为子进程附加 `CREATE_NO_WINDOW` 标志。
+/// 本程序是无控制台的 GUI 子系统（release），启动 net/sc/ollama 等控制台程序时
+/// 系统会为其分配一个新的控制台窗口，表现为一闪而过的黑窗；该标志可彻底避免。
+#[cfg(windows)]
+pub fn no_window(cmd: &mut std::process::Command) -> &mut std::process::Command {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    cmd.creation_flags(CREATE_NO_WINDOW)
+}
+
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct DiskInfo {
@@ -63,10 +73,11 @@ pub fn overview() -> Overview {
 
 #[cfg(windows)]
 fn is_elevated() -> bool {
-    std::process::Command::new("net")
-        .arg("session")
+    let mut cmd = std::process::Command::new("net");
+    cmd.arg("session")
         .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
+    no_window(&mut cmd)
         .status()
         .map(|s| s.success())
         .unwrap_or(false)
@@ -138,11 +149,12 @@ pub fn brew_cleanup() -> Result<String, String> {
 /// Windows 服务控制（清理 Windows 更新缓存前后使用）。
 #[cfg(windows)]
 pub mod svc {
+    use super::no_window;
+
     pub fn is_running(name: &str) -> bool {
-        let Ok(out) = std::process::Command::new("sc.exe")
-            .args(["query", name])
-            .output()
-        else {
+        let mut cmd = std::process::Command::new("sc.exe");
+        cmd.args(["query", name]);
+        let Ok(out) = no_window(&mut cmd).output() else {
             return false;
         };
         let text = String::from_utf8_lossy(&out.stdout);
@@ -150,10 +162,9 @@ pub mod svc {
     }
 
     pub fn stop(name: &str) -> Result<(), String> {
-        let out = std::process::Command::new("sc.exe")
-            .args(["stop", name])
-            .output()
-            .map_err(|e| format!("{e}"))?;
+        let mut cmd = std::process::Command::new("sc.exe");
+        cmd.args(["stop", name]);
+        let out = no_window(&mut cmd).output().map_err(|e| format!("{e}"))?;
         if out.status.success() {
             Ok(())
         } else {
@@ -162,10 +173,9 @@ pub mod svc {
     }
 
     pub fn start(name: &str) -> Result<(), String> {
-        let out = std::process::Command::new("sc.exe")
-            .args(["start", name])
-            .output()
-            .map_err(|e| format!("{e}"))?;
+        let mut cmd = std::process::Command::new("sc.exe");
+        cmd.args(["start", name]);
+        let out = no_window(&mut cmd).output().map_err(|e| format!("{e}"))?;
         if out.status.success() {
             Ok(())
         } else {

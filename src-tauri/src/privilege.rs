@@ -63,8 +63,10 @@ pub fn relaunch_elevated() -> Result<(), String> {
         let ps = format!(
             "Start-Process -FilePath '{exe_str}' -ArgumentList '--elevated' -Verb RunAs"
         );
-        let output = std::process::Command::new("powershell")
-            .args(["-NoProfile", "-WindowStyle", "Hidden", "-Command", &ps])
+        let mut cmd = std::process::Command::new("powershell");
+        cmd.args(["-NoProfile", "-WindowStyle", "Hidden", "-Command", &ps]);
+        crate::platform::no_window(&mut cmd);
+        let output = cmd
             .output()
             .map_err(|e| format!("启动提权进程失败: {e}"))?;
         if !output.status.success() {

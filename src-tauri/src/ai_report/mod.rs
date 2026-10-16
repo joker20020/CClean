@@ -58,12 +58,16 @@ fn guidance(rule_id: &str) -> &'static str {
 /// 尝试执行 `ollama list`，返回输出（未安装或失败返回空串）。
 /// 加超时保护：ollama 首次运行可能拉起后台服务，长时间无响应不应拖住扫描。
 fn ollama_list() -> String {
-    let mut child = match std::process::Command::new("ollama")
+    let mut command = std::process::Command::new("ollama");
+    command
         .arg("list")
         .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
+        .stderr(std::process::Stdio::piped());
+    #[cfg(windows)]
     {
+        crate::platform::no_window(&mut command);
+    }
+    let mut child = match command.spawn() {
         Ok(c) => c,
         Err(_) => return String::new(),
     };
